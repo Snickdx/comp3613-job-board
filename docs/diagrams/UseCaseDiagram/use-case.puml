@@ -1,0 +1,55 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam actorBorderColor #1B365D
+skinparam actorFontColor #1E232D
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #1B365D
+skinparam usecaseFontColor #1E232D
+skinparam rectangleBorderColor #1B365D
+skinparam rectangleBackgroundColor #F8FAFC
+skinparam arrowColor #1B365D
+
+actor "Graduate Applicant" as Graduate_Applicant
+actor "Employer" as Employer
+
+rectangle "Job Board" {
+  usecase "Create or update profile" as Create_or_update_profile
+  usecase "Upload or update resume" as Upload_or_update_resume
+  usecase "Select job preferences" as Select_job_preferences
+  usecase "Subscribe to notifications" as Subscribe_to_notifications
+  usecase "Receive notifications" as Receive_notifications
+  usecase "Apply to job listings" as Apply_to_job_listings
+  usecase "Check application status" as Check_application_status
+  usecase "Send and receive messages" as Send_and_receive_messages
+  usecase "Create or update job listings" as Create_or_update_job_listings
+  usecase "Submit listing for approval" as Submit_listing_for_approval
+  usecase "Accept or decline job applications" as Accept_or_decline_job_applications
+  usecase "Review listing requests" as Review_listing_requests
+  usecase "Approve or decline listing requests" as Approve_or_decline_listing_requests
+  usecase "Manage student notifications" as Manage_student_notifications
+}
+
+actor "Admin" as Admin
+
+Graduate_Applicant --> Create_or_update_profile
+Employer --> Create_or_update_profile
+Graduate_Applicant --> Upload_or_update_resume
+Graduate_Applicant --> Select_job_preferences
+Graduate_Applicant --> Subscribe_to_notifications
+Graduate_Applicant --> Receive_notifications
+Employer --> Receive_notifications
+Receive_notifications <-- Admin
+Graduate_Applicant --> Apply_to_job_listings
+Graduate_Applicant --> Check_application_status
+Graduate_Applicant --> Send_and_receive_messages
+Employer --> Send_and_receive_messages
+Send_and_receive_messages <-- Admin
+Employer --> Create_or_update_job_listings
+Employer --> Submit_listing_for_approval
+Employer --> Accept_or_decline_job_applications
+Review_listing_requests <-- Admin
+Approve_or_decline_listing_requests <-- Admin
+Manage_student_notifications <-- Admin
+
+@enduml

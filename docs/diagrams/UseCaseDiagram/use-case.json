@@ -1,0 +1,108 @@
+{
+  "system": "Job Board",
+  "actors": [
+    {
+      "name": "Graduate Applicant",
+      "side": "left"
+    },
+    {
+      "name": "Employer",
+      "side": "left"
+    },
+    {
+      "name": "Admin",
+      "side": "right"
+    }
+  ],
+  "use_cases": [
+    {
+      "name": "Create or update profile",
+      "actors": [
+        "Graduate Applicant",
+        "Employer"
+      ]
+    },
+    {
+      "name": "Upload or update resume",
+      "actors": [
+        "Graduate Applicant"
+      ]
+    },
+    {
+      "name": "Select job preferences",
+      "actors": [
+        "Graduate Applicant"
+      ]
+    },
+    {
+      "name": "Subscribe to notifications",
+      "actors": [
+        "Graduate Applicant"
+      ]
+    },
+    {
+      "name": "Receive notifications",
+      "actors": [
+        "Graduate Applicant",
+        "Employer",
+        "Admin"
+      ]
+    },
+    {
+      "name": "Apply to job listings",
+      "actors": [
+        "Graduate Applicant"
+      ]
+    },
+    {
+      "name": "Check application status",
+      "actors": [
+        "Graduate Applicant"
+      ]
+    },
+    {
+      "name": "Send and receive messages",
+      "actors": [
+        "Graduate Applicant",
+        "Employer",
+        "Admin"
+      ]
+    },
+    {
+      "name": "Create or update job listings",
+      "actors": [
+        "Employer"
+      ]
+    },
+    {
+      "name": "Submit listing for approval",
+      "actors": [
+        "Employer"
+      ]
+    },
+    {
+      "name": "Accept or decline job applications",
+      "actors": [
+        "Employer"
+      ]
+    },
+    {
+      "name": "Review listing requests",
+      "actors": [
+        "Admin"
+      ]
+    },
+    {
+      "name": "Approve or decline listing requests",
+      "actors": [
+        "Admin"
+      ]
+    },
+    {
+      "name": "Manage student notifications",
+      "actors": [
+        "Admin"
+      ]
+    }
+  ]
+}
