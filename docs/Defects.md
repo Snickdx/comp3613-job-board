@@ -19,4 +19,36 @@ Tested locally via /docs using seeded users (1 admin, 2 DCIT graduate,
 7)| D7 | Inconsistent response shape: unchanged transitions return a reduced snapshot with boolean flags; changed transitions return the full row with 0/1 integer flags | `lifecycle.py` `snapshot()` vs `applications.py` `transition_application()` | AC 11 (consistency) | evidence/d6.png 
 
 ## Root cause
-<!-- fill in after D1–D6 -->
+## Root cause
+
+All seven defects trace back to how the application lifecycle is stored
+and updated:
+
+1. **Status is stored twice.** Each application has a `status` string *and*
+   four boolean flags (`flag_reviewed`, `flag_shortlisted`, `flag_rejected`,
+   `flag_hired`). They are updated separately, so they drift out of sync
+   (D2, D3).
+
+2. **No defined legal transitions.** All actions go through one large nested
+   if/elif in `apply_action()`. Nothing states which moves are allowed from
+   each status, so illegal jumps are accepted (D1, D2) and some illegal
+   actions are silently ignored instead of rejected (D6).
+
+3. **Two different "sources of truth".** The employer path reads `status`,
+   but the graduate view reads the flags (`derived_status_from_flags`), so
+   the same application shows different statuses to different users (D4).
+   Responses are also built in two different ways (D7).
+
+4. **Authorization is separate from the lifecycle problem.**
+   `transition_application()` checks the actor's role but not whether they
+   own the listing, so other employers and admins can change status (D5).
+
+## Implication for Sprint 2
+
+- Replace status + flags with a single `status` field.
+- Use the **State pattern**: one class per lifecycle stage (Submitted,
+  Reviewed, Shortlisted, Rejected, Hired), each defining only its legal
+  transitions and raising an error for anything else.
+- Every view reads the same status, so users always see one consistent value.
+- Keep the ownership check in the service layer, before delegating to the
+  state object.
