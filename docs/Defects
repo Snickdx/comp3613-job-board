@@ -1,0 +1,22 @@
+# Lifecycle defect audit (Task #8)
+
+Scenario: Job board. Special feature: application lifecycle tracking.
+Tested locally via /docs using seeded users (1 admin, 2 DCIT graduate,
+4 employer owning listing 1, 5 employer2).
+
+1) | D1 | Hire allowed directly from `submitted` (skips review and shortlist) | `app/services/lifecycle.py`, `apply_action()` hire branch | AC 10 | evidence/d1.png 
+
+2)| D2 | Rejected application can be shortlisted without reopen; ends with flag_rejected=1 and flag_shortlisted=1 (contradictory), flag_reviewed=0 | `app/services/lifecycle.py`, `apply_action()` shortlist branch | AC 10, AC 11 | evidence/d2.png,D2.0.png
+
+3)| D3 | `reopen` from hired resets status to `submitted` but leaves flag_hired=1; reopen has no defined rule (allowed from any state) | `app/services/lifecycle.py`, `apply_action()` reopen branch | AC 10, AC 11 | evidence/d3.png 
+
+4)| D4 | Graduate view shows a status derived from flags, not the stored status — app 1 shows `hired` (actual `submitted`), app 2 shows `rejected` (actual `shortlisted`) | `app/services/applications.py` `my_applications()`; `app/services/lifecycle.py` `derived_status_from_flags()` | AC 11 | evidence/d4.png 
+
+5)| D5 | Non-owning employer (id 5) and admin (id 1) can advance an application on listing 1 — no ownership check | `app/services/applications.py` `transition_application()` | AC 12 | evidence/d5a.png, d5b.png |
+
+6)| D6 | Illegal action on a hired application (`mark_reviewed`) returns ok/200 with changed=false instead of an error; other illegal actions (shortlist) do return errors — inconsistent handling | `app/services/lifecycle.py`, `apply_action()` mark_reviewed branch | AC 10 | evidence/d6.png 
+
+7)| D7 | Inconsistent response shape: unchanged transitions return a reduced snapshot with boolean flags; changed transitions return the full row with 0/1 integer flags | `lifecycle.py` `snapshot()` vs `applications.py` `transition_application()` | AC 11 (consistency) | evidence/d6.png 
+
+## Root cause
+<!-- fill in after D1–D6 -->
