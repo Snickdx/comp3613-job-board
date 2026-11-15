@@ -2,7 +2,7 @@
   "system": "Job Board",
   "actors": [
     {
-      "name": "Graduate Applicant",
+      "name": "Graduate",
       "side": "left"
     },
     {
@@ -10,99 +10,123 @@
       "side": "left"
     },
     {
-      "name": "Admin",
+      "name": "Administrator",
       "side": "right"
     }
   ],
   "use_cases": [
     {
-      "name": "Create or update profile",
+      "name": "Browse published jobs",
       "actors": [
-        "Graduate Applicant",
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Subscribe to job alerts",
+      "actors": [
+        "Graduate"
+      ],
+      "includes": [
+        "Check programme eligibility"
+      ]
+    },
+    {
+      "name": "Receive job notifications",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Apply to job",
+      "actors": [
+        "Graduate"
+      ],
+      "includes": [
+        "Check programme eligibility"
+      ]
+    },
+    {
+      "name": "Go to external apply link",
+      "actors": [],
+      "extends": [
+        "Apply to job"
+      ]
+    },
+    {
+      "name": "View my application status",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Manage profile & resume",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Submit job listing",
+      "actors": [
         "Employer"
       ]
     },
     {
-      "name": "Upload or update resume",
+      "name": "View applicants for own listing",
       "actors": [
-        "Graduate Applicant"
+        "Employer"
+      ],
+      "includes": [
+        "Verify listing ownership"
       ]
     },
     {
-      "name": "Select job preferences",
+      "name": "Advance application lifecycle",
       "actors": [
-        "Graduate Applicant"
+        "Employer"
+      ],
+      "includes": [
+        "Verify listing ownership"
       ]
     },
     {
-      "name": "Subscribe to notifications",
+      "name": "Send / receive messages (future)",
       "actors": [
-        "Graduate Applicant"
-      ]
-    },
-    {
-      "name": "Receive notifications",
-      "actors": [
-        "Graduate Applicant",
         "Employer",
-        "Admin"
+        "Graduate"
       ]
     },
     {
-      "name": "Apply to job listings",
+      "name": "Review pending listings",
       "actors": [
-        "Graduate Applicant"
+        "Administrator"
       ]
     },
     {
-      "name": "Check application status",
+      "name": "Publish listing",
       "actors": [
-        "Graduate Applicant"
+        "Administrator"
+      ],
+      "includes": [
+        "Notify eligible subscribers"
       ]
     },
     {
-      "name": "Send and receive messages",
+      "name": "Export applicant package",
       "actors": [
-        "Graduate Applicant",
-        "Employer",
-        "Admin"
+        "Administrator"
       ]
     },
     {
-      "name": "Create or update job listings",
-      "actors": [
-        "Employer"
-      ]
+      "name": "Check programme eligibility",
+      "actors": []
     },
     {
-      "name": "Submit listing for approval",
-      "actors": [
-        "Employer"
-      ]
+      "name": "Verify listing ownership",
+      "actors": []
     },
     {
-      "name": "Accept or decline job applications",
-      "actors": [
-        "Employer"
-      ]
-    },
-    {
-      "name": "Review listing requests",
-      "actors": [
-        "Admin"
-      ]
-    },
-    {
-      "name": "Approve or decline listing requests",
-      "actors": [
-        "Admin"
-      ]
-    },
-    {
-      "name": "Manage student notifications",
-      "actors": [
-        "Admin"
-      ]
+      "name": "Notify eligible subscribers",
+      "actors": []
     }
   ]
 }

@@ -1,7 +1,8 @@
 @startuml
-!pragma layout smetana
 skinparam shadowing false
+skinparam defaultFontName Arial
 skinparam actorBorderColor #1B365D
+skinparam actorBackgroundColor #FFFFFF
 skinparam actorFontColor #1E232D
 skinparam usecaseBackgroundColor #FFFFFF
 skinparam usecaseBorderColor #1B365D
@@ -9,47 +10,99 @@ skinparam usecaseFontColor #1E232D
 skinparam rectangleBorderColor #1B365D
 skinparam rectangleBackgroundColor #F8FAFC
 skinparam arrowColor #1B365D
+skinparam noteBackgroundColor #FFF8E1
+skinparam noteBorderColor #C9A227
+skinparam usecase {
+  BackgroundColor<<special feature>> #FFE8CC
+  BorderColor<<special feature>> #C2410C
+  FontColor<<special feature>> #7C2D12
+}
+left to right direction
 
-actor "Graduate Applicant" as Graduate_Applicant
-actor "Employer" as Employer
+actor "Graduate\n(DCIT only)" as G
+actor "Employer" as E
+actor "Administrator" as A
 
 rectangle "Job Board" {
-  usecase "Create or update profile" as Create_or_update_profile
-  usecase "Upload or update resume" as Upload_or_update_resume
-  usecase "Select job preferences" as Select_job_preferences
-  usecase "Subscribe to notifications" as Subscribe_to_notifications
-  usecase "Receive notifications" as Receive_notifications
-  usecase "Apply to job listings" as Apply_to_job_listings
-  usecase "Check application status" as Check_application_status
-  usecase "Send and receive messages" as Send_and_receive_messages
-  usecase "Create or update job listings" as Create_or_update_job_listings
-  usecase "Submit listing for approval" as Submit_listing_for_approval
-  usecase "Accept or decline job applications" as Accept_or_decline_job_applications
-  usecase "Review listing requests" as Review_listing_requests
-  usecase "Approve or decline listing requests" as Approve_or_decline_listing_requests
-  usecase "Manage student notifications" as Manage_student_notifications
+  rectangle "Graduate use cases" as RG {
+    usecase "Browse published jobs" as UC_Browse
+    usecase "Subscribe to job alerts" as UC_Sub
+    usecase "Receive job notifications" as UC_Recv
+    usecase "Apply to job" as UC_Apply
+    usecase "Go to external apply link" as UC_External
+    usecase "View my application status" as UC_Status
+    usecase "Manage profile & resume" as UC_Profile
+  }
+
+  rectangle "Employer use cases" as RE {
+    usecase "Submit job listing" as UC_Submit
+    usecase "View applicants for own listing" as UC_ViewApps
+    usecase "Advance application lifecycle" <<special feature>> as UC_Life
+    usecase "Mark reviewed" <<special feature>> as UC_Rev
+    usecase "Shortlist applicant" <<special feature>> as UC_Short
+    usecase "Reject applicant" <<special feature>> as UC_Rej
+    usecase "Hire applicant" <<special feature>> as UC_Hire
+    usecase "Send / receive messages\n(future, low priority)" as UC_Msg
+  }
+
+  rectangle "Administrator use cases" as RA {
+    usecase "Review pending listings" as UC_ReviewL
+    usecase "Publish listing" as UC_Publish
+    usecase "Export applicant package" as UC_Export
+  }
+
+  rectangle "Included behaviour" as RI {
+    usecase "Check programme eligibility" as UC_Elig
+    usecase "Verify listing ownership" as UC_Own
+    usecase "Notify eligible subscribers" as UC_Notify
+  }
 }
 
-actor "Admin" as Admin
+G --> UC_Browse
+G --> UC_Sub
+G --> UC_Recv
+G --> UC_Apply
+G --> UC_Status
+G --> UC_Profile
 
-Graduate_Applicant --> Create_or_update_profile
-Employer --> Create_or_update_profile
-Graduate_Applicant --> Upload_or_update_resume
-Graduate_Applicant --> Select_job_preferences
-Graduate_Applicant --> Subscribe_to_notifications
-Graduate_Applicant --> Receive_notifications
-Employer --> Receive_notifications
-Receive_notifications <-- Admin
-Graduate_Applicant --> Apply_to_job_listings
-Graduate_Applicant --> Check_application_status
-Graduate_Applicant --> Send_and_receive_messages
-Employer --> Send_and_receive_messages
-Send_and_receive_messages <-- Admin
-Employer --> Create_or_update_job_listings
-Employer --> Submit_listing_for_approval
-Employer --> Accept_or_decline_job_applications
-Review_listing_requests <-- Admin
-Approve_or_decline_listing_requests <-- Admin
-Manage_student_notifications <-- Admin
+E --> UC_Submit
+E --> UC_ViewApps
+E --> UC_Life
+E --> UC_Msg
 
+A --> UC_ReviewL
+A --> UC_Publish
+A --> UC_Export
+
+UC_Rev -up-|> UC_Life
+UC_Short -up-|> UC_Life
+UC_Rej -up-|> UC_Life
+UC_Hire -up-|> UC_Life
+
+UC_External ..> UC_Apply : <<extend>>
+UC_Sub ..> UC_Elig : <<include>>
+UC_Apply ..> UC_Elig : <<include>>
+UC_ViewApps ..> UC_Own : <<include>>
+UC_Life ..> UC_Own : <<include>>
+UC_Publish ..> UC_Notify : <<include>>
+
+note right of RI
+  All use cases require <b>Log in</b>
+  (identity from session, not request body).
+  Graduates may also exchange messages
+  with employers (future, low priority).
+end note
+
+note bottom of UC_Life
+  <b>SPECIAL FEATURE</b> (AC 10, 11, 12)
+  submitted -> reviewed -> shortlisted -> rejected | hired
+  Only legal transitions; one consistent status.
+  Only the listing's employer may act (not admin).
+  Reopen rule: to be confirmed with stakeholders.
+end note
+
+note bottom of UC_External
+  Extension point: apply_mode = external.
+  No in-app application is created (AC 13).
+end note
 @enduml
