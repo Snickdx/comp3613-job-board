@@ -1,0 +1,201 @@
+@startuml
+title Job Board - Proposed Class Diagram
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1B365D
+  FontColor #1E232D
+}
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #1B365D
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+skinparam ArrowColor #1B365D
+
+hide empty members
+
+package "Domain model" as Domain {
+  enum UserRole {
+    graduate
+    employer
+    admin
+  }
+
+  enum ApplicationStatus {
+    submitted
+    reviewed
+    shortlisted
+    rejected
+    hired
+  }
+
+  enum ApplyMode {
+    externalLink
+    onPlatformCollect
+  }
+
+  enum ListingStatus {
+    pending
+    changesRequested
+    published
+    rejected
+  }
+
+  class User <<entity>> {
+    +id: int
+    +username: str
+    +email: str
+    +passwordHash: str
+    +role: UserRole
+    +programme: str?
+    +fieldPreference: str?
+    +resumeText: str?
+  }
+
+  class Listing <<entity>> {
+    +id: int
+    +title: str
+    +company: str
+    +description: str
+    +applyMode: ApplyMode
+    +externalUrl: str?
+    +deadline: Date
+    +status: ListingStatus
+    +reviewFeedback: str?
+    +submit()
+    +publish()
+    +requestRevisions(feedback)
+  }
+
+  class Application <<entity>> {
+    +id: int
+    +coverLetter: str
+    +resumeText: str
+    +status: ApplicationStatus
+  }
+
+  class Subscription <<entity>> {
+    +id: int
+  }
+
+  class Notification <<entity>> {
+    +id: int
+    +message: str
+    +createdAt: DateTime
+  }
+
+  User "1 employer" -- "0..* listings" Listing : submits
+  User "1 graduate" -- "0..* applications" Application : applies
+  Listing "1" -- "0..* applications" Application : receives
+  User "1 eligible graduate" -- "0..1 subscription" Subscription : subscribes
+  User "1 recipient" -- "0..* notifications" Notification : receives
+}
+
+package "Application lifecycle - State pattern" {
+  class ApplicationLifecycle <<context>> {
+    -application: Application
+    -state: ApplicationState
+    +transition(action): ApplicationStatus
+  }
+
+  abstract class ApplicationState <<state>> {
+    +review(): ApplicationState
+    +shortlist(): ApplicationState
+    +reject(): ApplicationState
+    +hire(): ApplicationState
+    +reopen(): ApplicationState
+  }
+
+  class SubmittedState <<concrete state>>
+  class ReviewedState <<concrete state>>
+  class ShortlistedState <<concrete state>>
+  class RejectedState <<concrete state>>
+  class HiredState <<concrete state>>
+  class IllegalTransition <<exception>>
+
+  ApplicationLifecycle --> Application : reads / updates status
+  ApplicationLifecycle o-- "1" ApplicationState : delegates to
+  ApplicationState <|-- SubmittedState
+  ApplicationState <|-- ReviewedState
+  ApplicationState <|-- ShortlistedState
+  ApplicationState <|-- RejectedState
+  ApplicationState <|-- HiredState
+  ApplicationState ..> IllegalTransition : raises for illegal action
+
+  SubmittedState ..> ReviewedState : review
+  ReviewedState ..> ShortlistedState : shortlist
+  ReviewedState ..> RejectedState : reject
+  ShortlistedState ..> HiredState : hire
+  ShortlistedState ..> RejectedState : reject
+  RejectedState ..> ReviewedState : reopen
+
+  note right of Application
+    One source of truth: status.
+    The inherited flag_reviewed,
+    flag_shortlisted, flag_rejected,
+    and flag_hired fields are removed.
+  end note
+
+  note bottom of ApplicationLifecycle
+    The service checks that the acting employer
+    owns the listing before calling transition.
+    Admins and other employers cannot advance it.
+  end note
+}
+
+package "Services" {
+  class ApplicationService <<service>> {
+    +apply(graduateId, listingId, coverLetter, resumeText)
+    +myApplications(graduateId)
+    +listingApplicants(employerId, listingId)
+    +transitionApplication(actorId, applicationId, action)
+    +exportApplicantPackage(adminId, listingId)
+  }
+
+  class ListingService <<service>> {
+    +subscribe(graduateId)
+    +submitListing(employerId, details)
+    +publishListing(adminId, listingId)
+  }
+
+  class NotificationService <<service>> {
+    +notifyEligibleSubscribers(listing)
+    +notifyApplicant(application)
+  }
+
+  ApplicationService ..> ApplicationLifecycle : transitions
+  ApplicationService ..> Application
+  ApplicationService ..> Listing
+  ListingService ..> Listing
+  ListingService ..> Subscription
+  ListingService ..> NotificationService : on publish
+  NotificationService ..> Notification : creates
+}
+
+package "Direct messaging - P2 extension" {
+  class MessageThread <<future>>
+  class Message <<future>> {
+    +id: int
+    +body: str
+    +sentAt: DateTime
+  }
+
+  Application "1" -- "0..1 thread" MessageThread : may have
+  MessageThread "1" *-- "0..* messages" Message : contains
+  User "2 participants" -- "0..* threads" MessageThread : employer + graduate
+  User "1 sender" -- "0..* messages" Message : sends
+}
+
+note bottom of Domain
+  Only DCIT graduates may subscribe or apply.
+  External-link listings redirect off-platform;
+  they do not create an Application.
+  Passwords are stored as hashes.
+end note
+@enduml
