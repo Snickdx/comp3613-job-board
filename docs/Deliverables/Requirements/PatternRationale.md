@@ -1,16 +1,17 @@
 # Pattern rationale — Application lifecycle (special feature)
 
-Scenario: Job board (`comp3613-job-board`). Trello task: #13.
+Scenario: Job board (`comp3613-job-board`). Trello task: #15.
 
 Evidence used in this document:
 
 | Evidence | Location |
 |---|---|
-| Lifecycle defect audit (D1–D7) | [Defects/LifecycleAudit.md](Defects/LifecycleAudit.md) |
-| Authorization & listings audit (A1–A11) | [Defects/AuthListingsAudit.md](Defects/AuthListingsAudit.md) |
-| Interview transcript (timestamps cited below) | [Interviews/InterviewChat.txt](Interviews/InterviewChat.txt) |
-| Requirements (FR/NFR IDs cited below) | [Requirements/Job Board Requirements & Interview Traceability.md](<Requirements/Job Board Requirements & Interview Traceability.md>) |
-| Public acceptance criteria (AC numbers) | [Requirements/ACCEPTANCE.md](Requirements/ACCEPTANCE.md) |
+| Lifecycle defect audit (D1–D7) | [Defects/LifecycleAudit.md](../Defects/LifecycleAudit.md) |
+| Authorization & listings audit (A1–A11) | [Defects/AuthListingsAudit.md](../Defects/AuthListingsAudit.md) |
+| Interview transcript (timestamps cited below) | [Interviews/InterviewChat.txt](../Interviews/InterviewChat.txt) |
+| Requirements (FR/NFR IDs cited below) | [Requirements/Job Board Requirements & Interview Traceability.md](<Job Board Requirements & Interview Traceability.md>) |
+| Public acceptance criteria (AC numbers) | [Requirements/ACCEPTANCE.md](ACCEPTANCE.md) |
+| Proposed class diagram (State pattern) | [diagrams/ClassDiagram/ClassDiagram.png](../diagrams/ClassDiagram/ClassDiagram.png) ([source](../diagrams/ClassDiagram/class-diagram.puml)) |
 
 Interview citations use the same format as the requirements document, e.g. *Item 3 (Employer) @ 07:47 AM*.
 
@@ -86,6 +87,19 @@ are legal from that stage and which stage each one leads to.
 
 Any action not listed raises `IllegalTransition`, which the API returns as an error (400/409)
 instead of silently succeeding.
+
+### Mapping to the class diagram
+
+The [proposed class diagram](../diagrams/ClassDiagram/ClassDiagram.png) shows the same design:
+
+| In this rationale | In the class diagram |
+|---|---|
+| Abstract state | `ApplicationState` (package *Application lifecycle - State pattern*) |
+| Five concrete states | `SubmittedState`, `ReviewedState`, `ShortlistedState`, `RejectedState`, `HiredState` |
+| Transition rules table above | Dependency arrows labelled `review`, `shortlist`, `reject`, `hire`, `reopen` between the concrete states |
+| Illegal moves rejected | `ApplicationState ..> IllegalTransition` |
+| Context holding one status | `ApplicationLifecycle` delegating to `ApplicationState`; `Application.status` with the four flags removed |
+| Client that checks ownership first | `ApplicationService.transitionApplication()` calling `ApplicationLifecycle.transition()` |
 
 ### Why State fits this problem
 
