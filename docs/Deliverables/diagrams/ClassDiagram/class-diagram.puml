@@ -1,5 +1,5 @@
 @startuml
-title Job Board - Proposed Class Diagram
+title Job Board - Class Diagram: Application Lifecycle (State pattern) vs Inherited Design
 skinparam shadowing false
 skinparam classAttributeIconSize 0
 skinparam defaultFontName Arial
@@ -7,6 +7,14 @@ skinparam class {
   BackgroundColor #FFFFFF
   BorderColor #1B365D
   FontColor #1E232D
+  BackgroundColor<<inherited>> #FDECEC
+  BorderColor<<inherited>> #B42318
+  BackgroundColor<<state>> #FFF4E5
+  BorderColor<<state>> #C2410C
+  BackgroundColor<<concrete state>> #FFF4E5
+  BorderColor<<concrete state>> #C2410C
+  BackgroundColor<<context>> #FFF4E5
+  BorderColor<<context>> #C2410C
 }
 skinparam package {
   BackgroundColor #F8FAFC
@@ -17,16 +25,151 @@ skinparam note {
   BorderColor #C9A227
 }
 skinparam ArrowColor #1B365D
-
 hide empty members
 
-package "Domain model" as Domain {
-  enum UserRole {
-    graduate
-    employer
-    admin
+' =====================================================================
+package "INHERITED DESIGN (before) - app/services/lifecycle.py" as Before {
+  class "Application" as OldApplication <<inherited>> {
+    +status: str
+    +flag_reviewed: int
+    +flag_shortlisted: int
+    +flag_rejected: int
+    +flag_hired: int
+  }
+  class "lifecycle" as OldLifecycle <<inherited>> {
+    +ACTIONS: tuple
+    +apply_action(app, action): dict
+    +derived_status_from_flags(app): str
+    +snapshot(app): dict
+  }
+  class "applications (service)" as OldService <<inherited>> {
+    +transition_application(actor_id, application_id, action)
+    +my_applications(graduate_id)
+  }
+  OldService ..> OldLifecycle : apply_action()\nderived_status_from_flags()
+  OldLifecycle ..> OldApplication : reads / writes\nstatus AND flags
+
+  note bottom of OldLifecycle
+    Status stored twice (string + 4 flags).
+    One nested if/elif handles every action;
+    no legal-transition rules.
+    Graduate view reads flags, employer reads status.
+    Causes D1-D7 (see LifecycleAudit.md).
+  end note
+}
+
+' =====================================================================
+package "PROPOSED: Application lifecycle - State pattern" as Proposed {
+  class ApplicationLifecycle <<context>> {
+    -application: Application
+    -state: ApplicationState
+    +transition(action): ApplicationStatus
   }
 
+  abstract class ApplicationState <<state>> {
+    {abstract} +status(): ApplicationStatus
+    +review(): ApplicationState
+    +shortlist(): ApplicationState
+    +reject(): ApplicationState
+    +hire(): ApplicationState
+    +reopen(): ApplicationState
+    {static} +fromStatus(status: ApplicationStatus): ApplicationState
+  }
+  note right of ApplicationState
+    Default implementation of every action
+    raises IllegalTransition.
+    Concrete states override ONLY their legal moves.
+    fromStatus() maps the stored status to its state
+    object; status() maps it back for saving.
+  end note
+
+  class SubmittedState <<concrete state>> {
+    +status(): ApplicationStatus
+    +review(): ApplicationState
+  }
+  class ReviewedState <<concrete state>> {
+    +status(): ApplicationStatus
+    +shortlist(): ApplicationState
+    +reject(): ApplicationState
+  }
+  class ShortlistedState <<concrete state>> {
+    +status(): ApplicationStatus
+    +hire(): ApplicationState
+    +reject(): ApplicationState
+  }
+  class RejectedState <<concrete state>> {
+    +status(): ApplicationStatus
+    +reopen(): ApplicationState
+  }
+  class HiredState <<concrete state>> {
+    +status(): ApplicationStatus
+  }
+  note bottom of HiredState
+    Final state: overrides no actions,
+    so every action raises IllegalTransition.
+  end note
+
+  class IllegalTransition <<exception>>
+
+  ApplicationLifecycle o-- "1" ApplicationState : delegates to
+  ApplicationState <|-- SubmittedState
+  ApplicationState <|-- ReviewedState
+  ApplicationState <|-- ShortlistedState
+  ApplicationState <|-- RejectedState
+  ApplicationState <|-- HiredState
+  ApplicationState ..> IllegalTransition : raises
+
+  SubmittedState ..> ReviewedState : review
+  ReviewedState ..> ShortlistedState : shortlist
+  ReviewedState ..> RejectedState : reject
+  ShortlistedState ..> HiredState : hire
+  ShortlistedState ..> RejectedState : reject
+  RejectedState ..> ReviewedState : reopen
+}
+
+' =====================================================================
+package "Services (routes -> services -> repositories -> models)" as Services {
+  class ApplicationService <<service>> {
+    +apply(graduateId, listingId, coverLetter, resumeText)
+    +myApplications(graduateId)
+    +listingApplicants(employerId, listingId)
+    +transitionApplication(actorId, applicationId, action)
+    +exportApplicantPackage(adminId, listingId)
+    -verifyListingOwner(actorId, listing)
+    -checkEligibility(graduate)
+  }
+  class ListingService <<service>> {
+    +subscribe(graduateId)
+    +submitListing(employerId, details)
+    +publishListing(adminId, listingId)
+  }
+  class NotificationService <<service>> {
+    +notifyEligibleSubscribers(listing)
+    +notifyApplicant(application)
+  }
+  note bottom of ApplicationService
+    transitionApplication(): identify actor ->
+    verifyListingOwner() -> ApplicationLifecycle.transition()
+    -> save status. Admins and other employers get 403.
+  end note
+}
+
+package "Repositories" as Repos {
+  class ApplicationRepository <<repository>> {
+    +get(id): Application
+    +save(application)
+    +forGraduate(graduateId): Application[*]
+    +forListing(listingId): Application[*]
+  }
+  class ListingRepository <<repository>> {
+    +get(id): Listing
+    +save(listing)
+    +publishedAndOpen(): Listing[*]
+  }
+}
+
+' =====================================================================
+package "Domain model" as Domain {
   enum ApplicationStatus {
     submitted
     reviewed
@@ -34,18 +177,25 @@ package "Domain model" as Domain {
     rejected
     hired
   }
-
-  enum ApplyMode {
-    externalLink
-    onPlatformCollect
+  enum UserRole {
+    graduate
+    employer
+    admin
   }
-
+  enum ApplyMode {
+    collect
+    external
+  }
   enum ListingStatus {
     pending
     changesRequested
     published
     rejected
   }
+  note bottom of ListingStatus
+    Listing review workflow from Admin/Employer
+    interviews - not part of the special feature.
+  end note
 
   class User <<entity>> {
     +id: int
@@ -57,7 +207,6 @@ package "Domain model" as Domain {
     +fieldPreference: str?
     +resumeText: str?
   }
-
   class Listing <<entity>> {
     +id: int
     +title: str
@@ -68,22 +217,20 @@ package "Domain model" as Domain {
     +deadline: Date
     +status: ListingStatus
     +reviewFeedback: str?
-    +submit()
-    +publish()
-    +requestRevisions(feedback)
   }
-
   class Application <<entity>> {
     +id: int
     +coverLetter: str
     +resumeText: str
     +status: ApplicationStatus
   }
-
+  note right of Application
+    One source of truth: status.
+    The four inherited flag_* fields are removed.
+  end note
   class Subscription <<entity>> {
     +id: int
   }
-
   class Notification <<entity>> {
     +id: int
     +message: str
@@ -93,109 +240,41 @@ package "Domain model" as Domain {
   User "1 employer" -- "0..* listings" Listing : submits
   User "1 graduate" -- "0..* applications" Application : applies
   Listing "1" -- "0..* applications" Application : receives
-  User "1 eligible graduate" -- "0..1 subscription" Subscription : subscribes
+  User "1 eligible graduate" -- "0..1" Subscription : subscribes
   User "1 recipient" -- "0..* notifications" Notification : receives
+  Application --> ApplicationStatus
 }
 
-package "Application lifecycle - State pattern" {
-  class ApplicationLifecycle <<context>> {
-    -application: Application
-    -state: ApplicationState
-    +transition(action): ApplicationStatus
-  }
-
-  abstract class ApplicationState <<state>> {
-    +review(): ApplicationState
-    +shortlist(): ApplicationState
-    +reject(): ApplicationState
-    +hire(): ApplicationState
-    +reopen(): ApplicationState
-  }
-
-  class SubmittedState <<concrete state>>
-  class ReviewedState <<concrete state>>
-  class ShortlistedState <<concrete state>>
-  class RejectedState <<concrete state>>
-  class HiredState <<concrete state>>
-  class IllegalTransition <<exception>>
-
-  ApplicationLifecycle --> Application : reads / updates status
-  ApplicationLifecycle o-- "1" ApplicationState : delegates to
-  ApplicationState <|-- SubmittedState
-  ApplicationState <|-- ReviewedState
-  ApplicationState <|-- ShortlistedState
-  ApplicationState <|-- RejectedState
-  ApplicationState <|-- HiredState
-  ApplicationState ..> IllegalTransition : raises for illegal action
-
-  SubmittedState ..> ReviewedState : review
-  ReviewedState ..> ShortlistedState : shortlist
-  ReviewedState ..> RejectedState : reject
-  ShortlistedState ..> HiredState : hire
-  ShortlistedState ..> RejectedState : reject
-  RejectedState ..> ReviewedState : reopen
-
-  note right of Application
-    One source of truth: status.
-    The inherited flag_reviewed,
-    flag_shortlisted, flag_rejected,
-    and flag_hired fields are removed.
-  end note
-
-  note bottom of ApplicationLifecycle
-    The service checks that the acting employer
-    owns the listing before calling transition.
-    Admins and other employers cannot advance it.
-  end note
-}
-
-package "Services" {
-  class ApplicationService <<service>> {
-    +apply(graduateId, listingId, coverLetter, resumeText)
-    +myApplications(graduateId)
-    +listingApplicants(employerId, listingId)
-    +transitionApplication(actorId, applicationId, action)
-    +exportApplicantPackage(adminId, listingId)
-  }
-
-  class ListingService <<service>> {
-    +subscribe(graduateId)
-    +submitListing(employerId, details)
-    +publishListing(adminId, listingId)
-  }
-
-  class NotificationService <<service>> {
-    +notifyEligibleSubscribers(listing)
-    +notifyApplicant(application)
-  }
-
-  ApplicationService ..> ApplicationLifecycle : transitions
-  ApplicationService ..> Application
-  ApplicationService ..> Listing
-  ListingService ..> Listing
-  ListingService ..> Subscription
-  ListingService ..> NotificationService : on publish
-  NotificationService ..> Notification : creates
-}
-
-package "Direct messaging - P2 extension" {
+package "Direct messaging - P2 extension (future)" as Msg {
   class MessageThread <<future>>
   class Message <<future>> {
     +id: int
     +body: str
     +sentAt: DateTime
   }
-
-  Application "1" -- "0..1 thread" MessageThread : may have
   MessageThread "1" *-- "0..* messages" Message : contains
-  User "2 participants" -- "0..* threads" MessageThread : employer + graduate
-  User "1 sender" -- "0..* messages" Message : sends
 }
+Application "1" -- "0..1 thread" MessageThread : may have
 
-note bottom of Domain
-  Only DCIT graduates may subscribe or apply.
-  External-link listings redirect off-platform;
-  they do not create an Application.
-  Passwords are stored as hashes.
-end note
+' ---- cross-package links ----
+ApplicationLifecycle --> Application : reads / updates status
+ApplicationService ..> ApplicationLifecycle : transitions
+ApplicationService ..> ApplicationRepository
+ApplicationService ..> ListingRepository
+ListingService ..> ListingRepository
+ListingService ..> NotificationService : on publish
+NotificationService ..> Notification : creates
+ApplicationRepository ..> Application : persists
+ListingRepository ..> Listing : persists
+
+' ---- refactor mapping (before -> after) ----
+OldLifecycle .[#B42318].> ApplicationState : <color:#B42318>replaced by</color>
+OldApplication .[#B42318].> Application : <color:#B42318>flags removed</color>
+OldService .[#B42318].> ApplicationService : <color:#B42318>refactored into</color>
+
+' ---- layout hints ----
+Before -[hidden]right- Proposed
+Proposed -[hidden]down- Services
+Services -[hidden]down- Repos
+Repos -[hidden]down- Domain
 @enduml
