@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from sqlmodel import Session, select
@@ -15,11 +16,26 @@ from app.services.board_auth import get_user
 ELIGIBLE_PROGRAMMES = {"DCIT"}
 
 
+def is_eligible_graduate(user: dict | None) -> bool:
+    return bool(
+        user
+        and user.get("role") == "graduate"
+        and user.get("programme") in ELIGIBLE_PROGRAMMES
+    )
+
+
+def is_open_to_graduates(listing: Listing, today: date | None = None) -> bool:
+    if today is None:
+        today = date.today()
+    return listing.status == "published" and date.fromisoformat(listing.deadline) >= today
+
+
 def subscribe(graduate_id: int) -> dict[str, Any]:
     user = get_user(graduate_id)
     if not user or user["role"] != "graduate":
         return {"ok": False, "error": "graduates only"}
-    # DEFECT: no programme eligibility check
+    if not is_eligible_graduate(user):
+        return {"ok": False, "error": "only eligible programme graduates may subscribe"}
     with Session(engine) as session:
         existing = session.exec(
             select(Subscription).where(Subscription.graduate_id == graduate_id)
@@ -32,9 +48,8 @@ def subscribe(graduate_id: int) -> dict[str, Any]:
 
 def list_jobs_for_graduates() -> list[dict[str, Any]]:
     with Session(engine) as session:
-        # DEFECT: returns pending + expired listings
         rows = session.exec(select(Listing).order_by(Listing.id)).all()
-        return [r.model_dump() for r in rows]
+        return [r.model_dump() for r in rows if is_open_to_graduates(r)]
 
 
 def list_pending_for_admin() -> list[dict[str, Any]]:
