@@ -19,13 +19,16 @@ def apply_action(app: dict[str, Any], action: str) -> dict[str, Any]:
     if action not in ACTIONS:
         return {
             "ok": False,
+            "code": "invalid_action",
             "error": f"unknown action {action!r}; expected one of {ACTIONS}",
         }
 
     try:
         next_state = state_for(app["status"]).transition(action)
-    except (IllegalTransition, ValueError) as exc:
-        return {"ok": False, "error": str(exc)}
+    except IllegalTransition as exc:
+        return {"ok": False, "code": "illegal_transition", "error": str(exc)}
+    except ValueError as exc:
+        return {"ok": False, "code": "invalid_action", "error": str(exc)}
 
     updated = dict(app)
     updated["status"] = next_state.status
