@@ -56,6 +56,11 @@ def apply(
         }
 
 
+def owns_listing(user: dict[str, Any], listing: Listing) -> bool:
+    """AC 12 + AC 15: an employer may only act on listings they submitted."""
+    return user["role"] == "employer" and listing.employer_id == user["id"]
+
+
 def my_applications(graduate_id: int) -> list[dict[str, Any]]:
     with Session(engine) as session:
         rows = session.exec(
@@ -77,8 +82,8 @@ def listing_applicants(viewer_id: int, listing_id: int) -> dict[str, Any]:
         listing = session.get(Listing, listing_id)
         if listing is None:
             return {"ok": False, "code": "not_found", "error": "listing not found"}
-        # DEFECT (IDOR): ownership not checked for employers
-        if viewer["role"] not in {"employer", "admin"}:
+        # admins keep read access for export (AC 16)
+        if viewer["role"] != "admin" and not owns_listing(viewer, listing):
             return {"ok": False, "code": "forbidden", "error": "forbidden"}
         rows = session.exec(
             select(Application)
@@ -105,8 +110,8 @@ def transition_application(
     actor = get_user(actor_id)
     if not actor:
         return {"ok": False, "code": "forbidden", "error": "unknown user"}
-    # DEFECT: admin may transition; any employer may transition any application
-    if actor["role"] not in {"employer", "admin"}:
+    # AC 12, admins do not move applications
+    if actor["role"] != "employer":
         return {"ok": False, "code": "forbidden", "error": "forbidden"}
     if action not in ACTIONS:
         return {
@@ -122,6 +127,15 @@ def transition_application(
                 "ok": False,
                 "code": "not_found",
                 "error": "application not found",
+            }
+
+        listing = session.get(Listing, row.listing_id)
+        # ownership is checked before the state is asked to move (D5)
+        if listing is None or not owns_listing(actor, listing):
+            return {
+                "ok": False,
+                "code": "forbidden",
+                "error": "only the listing employer may change this application",
             }
 
         result = apply_action(row.model_dump(), action)
