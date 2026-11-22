@@ -15,7 +15,7 @@ class ApplicationState:
         raise IllegalTransition(self.status, "review")
 
     def mark_reviewed(self) -> "ApplicationState":
-        return self.review()
+        raise IllegalTransition(self.status, "mark_reviewed")
 
     def shortlist(self) -> "ApplicationState":
         raise IllegalTransition(self.status, "shortlist")
@@ -48,6 +48,9 @@ class SubmittedState(ApplicationState):
     status = "submitted"
 
     def review(self) -> "ReviewedState":
+        return ReviewedState()
+
+    def mark_reviewed(self) -> "ReviewedState":
         return ReviewedState()
 
 
