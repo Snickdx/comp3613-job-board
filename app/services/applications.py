@@ -11,6 +11,7 @@ from app.models.application import Application
 from app.models.listing import Listing
 from app.services.board_auth import get_user
 from app.services.lifecycle import ACTIONS, apply_action, derived_status_from_flags
+from app.services.listings import is_eligible_graduate, is_open_to_graduates
 
 
 def apply(
@@ -22,14 +23,21 @@ def apply(
     user = get_user(graduate_id)
     if not user or user["role"] != "graduate":
         return {"ok": False, "error": "graduates only"}
-    # DEFECT: no programme eligibility check
+    if not is_eligible_graduate(user):
+        return {"ok": False, "error": "only eligible programme graduates may apply"}
 
     with Session(engine) as session:
         listing = session.get(Listing, listing_id)
-        if listing is None:
-            return {"ok": False, "error": "listing not found"}
+        if listing is None or not is_open_to_graduates(listing):
+            return {"ok": False, "error": "listing not found or no longer open"}
 
-        # DEFECT: allows apply on pending / expired; external still creates a row
+        # AC 13: external listings must not create an Application row.
+        if listing.apply_mode == "external":
+            return {
+                "ok": False,
+                "error": "this listing takes applications externally",
+                "external_url": listing.external_url,
+            }
         resume = resume_text or user.get("resume_text") or ""
         application = Application(
             listing_id=listing_id,
