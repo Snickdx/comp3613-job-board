@@ -12,6 +12,20 @@ from app.services import board_auth as auth
 
 router = APIRouter(tags=["job-board"])
 
+ERROR_STATUS = {
+    "invalid_action": 400,
+    "forbidden": 403,
+    "not_found": 404,
+    "illegal_transition": 409,
+}
+
+
+def raise_for_error(result, default=400):
+    raise HTTPException(
+        status_code=ERROR_STATUS.get(result.get("code"), default),
+        detail=result.get("error"),
+    )
+
 
 class LoginBody(BaseModel):
     email: str
@@ -126,7 +140,7 @@ def my_apps(actor_id: int) -> dict[str, Any]:
 def applicants(listing_id: int, actor_id: int) -> dict[str, Any]:
     result = applications.listing_applicants(actor_id, listing_id)
     if not result.get("ok"):
-        raise HTTPException(status_code=403, detail=result.get("error"))
+        raise_for_error(result)
     return result
 
 
@@ -134,7 +148,7 @@ def applicants(listing_id: int, actor_id: int) -> dict[str, Any]:
 def export(listing_id: int, actor_id: int) -> dict[str, Any]:
     result = applications.export_applicants(actor_id, listing_id)
     if not result.get("ok"):
-        raise HTTPException(status_code=403, detail=result.get("error"))
+        raise_for_error(result)
     return result
 
 
@@ -144,5 +158,5 @@ def transition(application_id: int, body: TransitionBody) -> dict[str, Any]:
         body.actor_id, application_id, body.action
     )
     if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise_for_error(result)
     return result
