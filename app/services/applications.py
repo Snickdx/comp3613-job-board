@@ -10,7 +10,7 @@ from app.database import engine
 from app.models.application import Application
 from app.models.listing import Listing
 from app.services.board_auth import get_user
-from app.services.lifecycle import ACTIONS, apply_action, derived_status_from_flags
+from app.services.lifecycle import ACTIONS, apply_action
 
 
 def apply(
@@ -37,10 +37,6 @@ def apply(
             cover_letter=cover_letter,
             resume_text=resume,
             status="submitted",
-            flag_reviewed=0,
-            flag_shortlisted=0,
-            flag_rejected=0,
-            flag_hired=0,
         )
         session.add(application)
         session.commit()
@@ -61,11 +57,7 @@ def my_applications(graduate_id: int) -> list[dict[str, Any]]:
         ).all()
         results = []
         for row in rows:
-            app = row.model_dump()
-            # DEFECT: graduate view sometimes uses flag-derived status, not column
-            view = dict(app)
-            view["status"] = derived_status_from_flags(app)
-            results.append(view)
+            results.append(row.model_dump())
         return results
 
 
@@ -128,10 +120,6 @@ def transition_application(
 
         updated = result["row"]
         row.status = updated["status"]
-        row.flag_reviewed = updated["flag_reviewed"]
-        row.flag_shortlisted = updated["flag_shortlisted"]
-        row.flag_rejected = updated["flag_rejected"]
-        row.flag_hired = updated["flag_hired"]
         session.add(row)
         session.commit()
         session.refresh(row)

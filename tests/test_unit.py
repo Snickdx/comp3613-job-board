@@ -131,3 +131,12 @@ def test_illegal_application_transitions(state, actions):
 def test_unknown_application_action_is_refused():
     with pytest.raises(ValueError, match="unknown action"):
         SubmittedState().transition("cancel")
+
+
+def test_application_model_has_only_status_for_lifecycle():
+    from app.models.application import Application
+
+    fields = set(Application.model_fields)
+
+    assert "status" in fields
+    assert not any(field.startswith("flag_") for field in fields)
