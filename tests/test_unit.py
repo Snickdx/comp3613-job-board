@@ -1,8 +1,17 @@
 from types import SimpleNamespace
 
 import jwt
+import pytest
 
 from app.services.auth_service import AuthService
+from app.services.application_states import (
+    HiredState,
+    IllegalTransition,
+    RejectedState,
+    ReviewedState,
+    ShortlistedState,
+    SubmittedState,
+)
 from app.utilities.security import encrypt_password, verify_password
 
 
@@ -65,7 +74,60 @@ def test_access_token_contains_subject_and_role():
         settings.secret_key,
         algorithms=[settings.jwt_algorithm],
     )
-
     assert payload["sub"] == "7"
     assert payload["role"] == "admin"
     assert "exp" in payload
+
+
+@pytest.mark.parametrize(
+    ("state", "action", "expected_status", "expected_type"),
+    [
+        (SubmittedState(), "mark_reviewed", "reviewed", ReviewedState),
+        (SubmittedState(), "review", "reviewed", ReviewedState),
+        (ReviewedState(), "shortlist", "shortlisted", ShortlistedState),
+        (ReviewedState(), "reject", "rejected", RejectedState),
+        (ShortlistedState(), "hire", "hired", HiredState),
+        (ShortlistedState(), "reject", "rejected", RejectedState),
+        (RejectedState(), "reopen", "reviewed", ReviewedState),
+    ],
+)
+def test_legal_application_transitions(
+    state, action, expected_status, expected_type
+):
+    next_state = state.transition(action)
+
+    assert isinstance(next_state, expected_type)
+    assert next_state.status == expected_status
+
+
+@pytest.mark.parametrize(
+    ("state", "actions"),
+    [
+        (SubmittedState(), ("shortlist", "reject", "hire", "reopen")),
+        (ReviewedState(), ("review", "mark_reviewed", "hire", "reopen")),
+        (
+            ShortlistedState(),
+            ("review", "mark_reviewed", "shortlist", "reopen"),
+        ),
+        (
+            RejectedState(),
+            ("review", "mark_reviewed", "shortlist", "reject", "hire"),
+        ),
+        (
+            HiredState(),
+            ("review", "mark_reviewed", "shortlist", "reject", "hire", "reopen"),
+        ),
+    ],
+)
+def test_illegal_application_transitions(state, actions):
+    for action in actions:
+        with pytest.raises(IllegalTransition) as exc_info:
+            state.transition(action)
+
+        assert exc_info.value.status == state.status
+        assert exc_info.value.action == action
+
+
+def test_unknown_application_action_is_refused():
+    with pytest.raises(ValueError, match="unknown action"):
+        SubmittedState().transition("cancel")
