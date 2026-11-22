@@ -64,14 +64,14 @@ def my_applications(graduate_id: int) -> list[dict[str, Any]]:
 def listing_applicants(viewer_id: int, listing_id: int) -> dict[str, Any]:
     viewer = get_user(viewer_id)
     if not viewer:
-        return {"ok": False, "error": "unknown user"}
+        return {"ok": False, "code": "forbidden", "error": "unknown user"}
     with Session(engine) as session:
         listing = session.get(Listing, listing_id)
         if listing is None:
-            return {"ok": False, "error": "listing not found"}
+            return {"ok": False, "code": "not_found", "error": "listing not found"}
         # DEFECT (IDOR): ownership not checked for employers
         if viewer["role"] not in {"employer", "admin"}:
-            return {"ok": False, "error": "forbidden"}
+            return {"ok": False, "code": "forbidden", "error": "forbidden"}
         rows = session.exec(
             select(Application)
             .where(Application.listing_id == listing_id)
@@ -83,7 +83,7 @@ def listing_applicants(viewer_id: int, listing_id: int) -> dict[str, Any]:
 def export_applicants(admin_id: int, listing_id: int) -> dict[str, Any]:
     admin = get_user(admin_id)
     if not admin or admin["role"] != "admin":
-        return {"ok": False, "error": "admin only"}
+        return {"ok": False, "code": "forbidden", "error": "admin only"}
     result = listing_applicants(admin_id, listing_id)
     if not result.get("ok"):
         return result
@@ -96,17 +96,25 @@ def transition_application(
     """Drive the poorly factored lifecycle module."""
     actor = get_user(actor_id)
     if not actor:
-        return {"ok": False, "error": "unknown user"}
+        return {"ok": False, "code": "forbidden", "error": "unknown user"}
     # DEFECT: admin may transition; any employer may transition any application
     if actor["role"] not in {"employer", "admin"}:
-        return {"ok": False, "error": "forbidden"}
+        return {"ok": False, "code": "forbidden", "error": "forbidden"}
     if action not in ACTIONS:
-        return {"ok": False, "error": f"action must be one of {ACTIONS}"}
+        return {
+            "ok": False,
+            "code": "invalid_action",
+            "error": f"action must be one of {ACTIONS}",
+        }
 
     with Session(engine) as session:
         row = session.get(Application, application_id)
         if row is None:
-            return {"ok": False, "error": "application not found"}
+            return {
+                "ok": False,
+                "code": "not_found",
+                "error": "application not found",
+            }
 
         result = apply_action(row.model_dump(), action)
         if not result.get("ok"):
