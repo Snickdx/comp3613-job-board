@@ -2,7 +2,7 @@
 
 Each test is named after the defect it guards against:
 - D1–D7: docs/Deliverables/Defects/LifecycleAudit.md
-- A1–A7: docs/Deliverables/Defects/AuthListingsAudit.md
+- A1–A10: docs/Deliverables/Defects/AuthListingsAudit.md
 
 The tests go through the JSON API, so they check both the behaviour and the
 HTTP status codes from S2-#8. They use their own in-memory database seeded
@@ -22,6 +22,8 @@ from app.dependencies.auth import get_current_user
 from app.main import app
 from app.models.application import Application
 from app.models.listing import Listing
+from app.models.notification import Notification
+from app.models.subscription import Subscription
 from app.models.user import User
 
 # Ids match the seed data used in both audits.
@@ -121,6 +123,31 @@ def stored_status(engine, application_id):
 def application_count(engine):
     with Session(engine) as session:
         return len(session.exec(select(Application)).all())
+
+
+def notifications_for(engine, user_id, listing_id):
+    with Session(engine) as session:
+        return session.exec(
+            select(Notification).where(
+                Notification.user_id == user_id, Notification.listing_id == listing_id
+            )
+        ).all()
+
+
+def submit_listing(client, login_as):
+    login_as(EMPLOYER)
+    response = client.post(
+        "/api/employer/listings",
+        json={
+            "title": "Backend Intern",
+            "company": "Acme Soft",
+            "description": "APIs",
+            "apply_mode": "collect",
+            "deadline": "2099-12-31",
+        },
+    )
+    assert response.status_code == 200
+    return response.json()
 
 
 # ---------------------------------------------------------------------------
@@ -288,3 +315,47 @@ def test_A7_employer_cannot_view_another_employers_applicants(client, login_as, 
     assert other.status_code == 403
     assert owner.status_code == 200
     assert admin.status_code == 200  # AC 16: admin export still allowed
+
+
+def test_A8_new_listing_is_pending_until_an_admin_publishes_it(client, login_as):
+    created = submit_listing(client, login_as)
+    listing_id = created["listing_id"]
+
+    assert created["status"] == "pending"
+    assert listing_id not in [job["id"] for job in client.get("/api/jobs").json()["jobs"]]
+    login_as(ADMIN)
+    pending = client.get("/api/admin/listings/pending").json()["listings"]
+    assert listing_id in [listing["id"] for listing in pending]
+
+    assert client.post(f"/api/admin/listings/{listing_id}/publish").status_code == 200
+
+    assert listing_id in [job["id"] for job in client.get("/api/jobs").json()["jobs"]]
+
+
+def test_A9_publishing_notifies_subscribers_automatically(client, login_as, audit_db):
+    login_as(GRAD_DCIT)
+    assert client.post("/api/graduates/subscribe").status_code == 200
+    listing_id = submit_listing(client, login_as)["listing_id"]
+
+    login_as(ADMIN)
+    response = client.post(f"/api/admin/listings/{listing_id}/publish")
+
+    assert response.json()["notified"] == 1
+    assert len(notifications_for(audit_db, GRAD_DCIT, listing_id)) == 1
+
+
+def test_A10_notify_skips_ineligible_subscribers_and_duplicates(client, login_as, audit_db):
+    # An ineligible subscription left over from before A2 was fixed.
+    with Session(audit_db) as session:
+        session.add_all([Subscription(graduate_id=GRAD_DCIT), Subscription(graduate_id=GRAD_OTHER)])
+        session.commit()
+    listing_id = submit_listing(client, login_as)["listing_id"]
+
+    login_as(ADMIN)
+    published = client.post(f"/api/admin/listings/{listing_id}/publish")
+    resent = client.post(f"/api/admin/listings/{listing_id}/notify")
+
+    assert published.json()["notified"] == 1
+    assert resent.json()["count"] == 0
+    assert len(notifications_for(audit_db, GRAD_DCIT, listing_id)) == 1
+    assert notifications_for(audit_db, GRAD_OTHER, listing_id) == []
