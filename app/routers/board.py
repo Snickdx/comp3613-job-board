@@ -41,25 +41,18 @@ class ListingBody(BaseModel):
     apply_mode: str = Field(description="collect | external")
     deadline: str = Field(description="ISO date YYYY-MM-DD")
     external_url: str | None = None
-    actor_id: int = Field(description="Acting user id (demo auth)")
-
-
-class ActorBody(BaseModel):
-    actor_id: int
 
 
 class ApplyBody(BaseModel):
     listing_id: int
     cover_letter: str
     resume_text: str | None = None
-    actor_id: int
 
 
 class TransitionBody(BaseModel):
     action: str = Field(
         description="review | mark_reviewed | shortlist | reject | hire | reopen"
     )
-    actor_id: int
 
 
 @router.post("/auth/login")
@@ -98,8 +91,8 @@ def pending(user: AdminDep) -> dict[str, Any]:
 @router.post("/employer/listings")
 def submit_listing(user: AuthDep, body: ListingBody) -> dict[str, Any]:
     result = listings.submit_listing(
-        user.actor_id,
-        user.title,
+        user.id,
+        body.title,
         body.company,
         body.description,
         body.apply_mode,

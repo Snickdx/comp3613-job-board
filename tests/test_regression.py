@@ -2,11 +2,15 @@
 
 Each test is named after the defect it guards against:
 - D1–D7: docs/Deliverables/Defects/LifecycleAudit.md
-- A2–A7: docs/Deliverables/Defects/AuthListingsAudit.md
+- A1–A7: docs/Deliverables/Defects/AuthListingsAudit.md
 
 The tests go through the JSON API, so they check both the behaviour and the
 HTTP status codes from S2-#8. They use their own in-memory database seeded
 like app/seed.py, so user and listing ids match the audit write-ups.
+
+Since S2-#11 the API identifies the caller from the JWT session cookie
+(AuthDep / AdminDep). The `login_as` fixture stands in for a logged-in user by
+overriding get_current_user, so each test can act as a specific seeded user.
 """
 
 import pytest
@@ -14,6 +18,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 
+from app.dependencies.auth import get_current_user
 from app.main import app
 from app.models.application import Application
 from app.models.listing import Listing
@@ -62,24 +67,49 @@ def audit_db(monkeypatch):
 
 @pytest.fixture
 def client(audit_db):
-    return TestClient(app)
+    yield TestClient(app)
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def application_id(client):
+def login_as(audit_db):
+    """Act as a seeded user: the API's get_current_user returns that user."""
+
+    def _login_as(user_id):
+        with Session(audit_db) as session:
+            user = session.get(User, user_id)
+        app.dependency_overrides[get_current_user] = lambda: user
+
+    return _login_as
+
+
+@pytest.fixture
+def application_id(client, login_as):
     """An application from the DCIT graduate to the open listing, status 'submitted'."""
-    response = client.post(
-        "/api/graduates/applications",
-        json={"actor_id": GRAD_DCIT, "listing_id": OPEN_LISTING, "cover_letter": "Hello"},
-    )
+    login_as(GRAD_DCIT)
+    response = apply_to(client, OPEN_LISTING)
     assert response.status_code == 200
     return response.json()["application_id"]
 
 
-def transition(client, application_id, action, actor=EMPLOYER):
+# Request bodies still declare actor_id (S2-#11 left it in the schema). The API
+# ignores it now; the caller always comes from the session. Sending 0 makes that
+# obvious, and test_A1_actor_id_in_body_is_ignored checks it.
+IGNORED_ACTOR_ID = 0
+
+
+def apply_to(client, listing_id):
+    return client.post(
+        "/api/graduates/applications",
+        json={"listing_id": listing_id, "cover_letter": "Hello", "actor_id": IGNORED_ACTOR_ID},
+    )
+
+
+def transition(client, login_as, application_id, action, actor=EMPLOYER):
+    login_as(actor)
     return client.post(
         f"/api/applications/{application_id}/transition",
-        json={"action": action, "actor_id": actor},
+        json={"action": action, "actor_id": IGNORED_ACTOR_ID},
     )
 
 
@@ -98,28 +128,28 @@ def application_count(engine):
 # ---------------------------------------------------------------------------
 
 
-def test_D1_hire_from_submitted_is_refused(client, audit_db, application_id):
-    response = transition(client, application_id, "hire")
+def test_D1_hire_from_submitted_is_refused(client, login_as, audit_db, application_id):
+    response = transition(client, login_as, application_id, "hire")
 
     assert response.status_code == 409
     assert stored_status(audit_db, application_id) == "submitted"
 
 
-def test_D2_rejected_application_cannot_be_shortlisted(client, audit_db, application_id):
-    assert transition(client, application_id, "review").status_code == 200
-    assert transition(client, application_id, "reject").status_code == 200
+def test_D2_rejected_application_cannot_be_shortlisted(client, login_as, audit_db, application_id):
+    assert transition(client, login_as, application_id, "review").status_code == 200
+    assert transition(client, login_as, application_id, "reject").status_code == 200
 
-    response = transition(client, application_id, "shortlist")
+    response = transition(client, login_as, application_id, "shortlist")
 
     assert response.status_code == 409
     assert stored_status(audit_db, application_id) == "rejected"
 
 
-def test_D3_reopen_leaves_one_consistent_status(client, audit_db, application_id):
-    transition(client, application_id, "review")
-    transition(client, application_id, "reject")
+def test_D3_reopen_leaves_one_consistent_status(client, login_as, application_id):
+    transition(client, login_as, application_id, "review")
+    transition(client, login_as, application_id, "reject")
 
-    response = transition(client, application_id, "reopen")
+    response = transition(client, login_as, application_id, "reopen")
 
     assert response.status_code == 200
     assert response.json()["application"]["status"] == "reviewed"
@@ -128,54 +158,50 @@ def test_D3_reopen_leaves_one_consistent_status(client, audit_db, application_id
         assert flag not in Application.model_fields
 
 
-def test_D4_graduate_and_employer_see_the_same_status(client, application_id):
+def test_D4_graduate_and_employer_see_the_same_status(client, login_as, application_id):
     for action in ("review", "shortlist", "hire"):
-        transition(client, application_id, action)
+        transition(client, login_as, application_id, action)
 
-        graduate_view = client.get(
-            "/api/graduates/applications", params={"actor_id": GRAD_DCIT}
-        ).json()["applications"]
-        employer_view = client.get(
-            f"/api/listings/{OPEN_LISTING}/applicants", params={"actor_id": EMPLOYER}
-        ).json()["applicants"]
+        login_as(GRAD_DCIT)
+        graduate_view = client.get("/api/graduates/applications").json()["applications"]
+        login_as(EMPLOYER)
+        employer_view = client.get(f"/api/listings/{OPEN_LISTING}/applicants").json()["applicants"]
 
         assert graduate_view[0]["status"] == employer_view[0]["status"]
 
 
 @pytest.mark.parametrize("actor", [EMPLOYER2, ADMIN], ids=["other_employer", "admin"])
-def test_D5_only_listing_employer_can_transition(client, audit_db, application_id, actor):
-    response = transition(client, application_id, "review", actor=actor)
+def test_D5_only_listing_employer_can_transition(client, login_as, audit_db, application_id, actor):
+    response = transition(client, login_as, application_id, "review", actor=actor)
 
     assert response.status_code == 403
     assert stored_status(audit_db, application_id) == "submitted"
 
 
-def test_D6_illegal_action_on_hired_is_an_error_not_silent_ok(client, application_id):
+def test_D6_illegal_action_on_hired_is_an_error_not_silent_ok(client, login_as, application_id):
     for action in ("review", "shortlist", "hire"):
-        transition(client, application_id, action)
+        transition(client, login_as, application_id, action)
 
-    response = transition(client, application_id, "review")
+    response = transition(client, login_as, application_id, "review")
 
     assert response.status_code == 409
     assert "hired" in response.json()["detail"]
 
 
-def test_D7_transition_response_matches_stored_application(client, application_id):
-    response = transition(client, application_id, "review")
+def test_D7_transition_response_matches_stored_application(client, login_as, application_id):
+    response = transition(client, login_as, application_id, "review")
 
     returned = response.json()["application"]
-    stored = client.get(
-        f"/api/listings/{OPEN_LISTING}/applicants", params={"actor_id": EMPLOYER}
-    ).json()["applicants"][0]
+    stored = client.get(f"/api/listings/{OPEN_LISTING}/applicants").json()["applicants"][0]
     assert returned == stored
 
 
-def test_unknown_action_returns_400(client, application_id):
-    assert transition(client, application_id, "promote").status_code == 400
+def test_unknown_action_returns_400(client, login_as, application_id):
+    assert transition(client, login_as, application_id, "promote").status_code == 400
 
 
-def test_missing_application_returns_404(client):
-    assert transition(client, 999, "review").status_code == 404
+def test_missing_application_returns_404(client, login_as):
+    assert transition(client, login_as, 999, "review").status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -183,16 +209,39 @@ def test_missing_application_returns_404(client):
 # ---------------------------------------------------------------------------
 
 
-def test_A2_ineligible_graduate_cannot_subscribe(client):
-    assert client.post("/api/graduates/subscribe", json={"actor_id": GRAD_OTHER}).status_code == 400
-    assert client.post("/api/graduates/subscribe", json={"actor_id": GRAD_DCIT}).status_code == 200
+def test_A1_requests_without_a_session_are_rejected(client, application_id):
+    app.dependency_overrides.clear()  # no logged-in user
 
-
-def test_A3_ineligible_graduate_cannot_apply(client, audit_db):
     response = client.post(
-        "/api/graduates/applications",
-        json={"actor_id": GRAD_OTHER, "listing_id": OPEN_LISTING, "cover_letter": "Hi"},
+        f"/api/applications/{application_id}/transition",
+        json={"action": "review", "actor_id": EMPLOYER},
     )
+
+    assert response.status_code == 401
+
+
+def test_A1_actor_id_in_body_is_ignored(client, login_as, audit_db, application_id):
+    # Logged in as employer2 but claiming to be the listing owner in the body.
+    login_as(EMPLOYER2)
+    response = client.post(
+        f"/api/applications/{application_id}/transition",
+        json={"action": "review", "actor_id": EMPLOYER},
+    )
+
+    assert response.status_code == 403
+    assert stored_status(audit_db, application_id) == "submitted"
+
+
+def test_A2_ineligible_graduate_cannot_subscribe(client, login_as):
+    login_as(GRAD_OTHER)
+    assert client.post("/api/graduates/subscribe").status_code == 400
+    login_as(GRAD_DCIT)
+    assert client.post("/api/graduates/subscribe").status_code == 200
+
+
+def test_A3_ineligible_graduate_cannot_apply(client, login_as, audit_db):
+    login_as(GRAD_OTHER)
+    response = apply_to(client, OPEN_LISTING)
 
     assert response.status_code == 400
     assert application_count(audit_db) == 0
@@ -204,38 +253,37 @@ def test_A4_job_list_hides_pending_and_expired_listings(client):
     assert [job["id"] for job in jobs] == [OPEN_LISTING]
 
 
-def test_A5_cannot_apply_to_expired_listing(client, audit_db):
-    response = client.post(
-        "/api/graduates/applications",
-        json={"actor_id": GRAD_DCIT, "listing_id": EXPIRED_LISTING, "cover_letter": "Hi"},
-    )
+def test_A5_cannot_apply_to_expired_listing(client, login_as, audit_db):
+    login_as(GRAD_DCIT)
+    response = apply_to(client, EXPIRED_LISTING)
 
     assert response.status_code == 400
     assert application_count(audit_db) == 0
 
 
-def test_A6_cannot_apply_in_app_to_pending_or_external_listing(client, audit_db):
-    apply = lambda: client.post(
-        "/api/graduates/applications",
-        json={"actor_id": GRAD_DCIT, "listing_id": PENDING_EXTERNAL_LISTING, "cover_letter": "Hi"},
-    )
-
+def test_A6_cannot_apply_in_app_to_pending_or_external_listing(client, login_as, audit_db):
     # Still pending: hidden from graduates.
-    assert apply().status_code == 400
+    login_as(GRAD_DCIT)
+    assert apply_to(client, PENDING_EXTERNAL_LISTING).status_code == 400
 
     # Once published it is visible, but it is external-link, so no row is stored (AC 13).
-    client.post(f"/api/admin/listings/{PENDING_EXTERNAL_LISTING}/publish", json={"actor_id": ADMIN})
-    response = apply()
+    login_as(ADMIN)
+    assert client.post(f"/api/admin/listings/{PENDING_EXTERNAL_LISTING}/publish").status_code == 200
+    login_as(GRAD_DCIT)
+    response = apply_to(client, PENDING_EXTERNAL_LISTING)
 
     assert response.status_code == 400
     assert "externally" in response.json()["detail"]
     assert application_count(audit_db) == 0
 
 
-def test_A7_employer_cannot_view_another_employers_applicants(client, application_id):
-    other = client.get(f"/api/listings/{OPEN_LISTING}/applicants", params={"actor_id": EMPLOYER2})
-    owner = client.get(f"/api/listings/{OPEN_LISTING}/applicants", params={"actor_id": EMPLOYER})
-    admin = client.get(f"/api/admin/listings/{OPEN_LISTING}/export", params={"actor_id": ADMIN})
+def test_A7_employer_cannot_view_another_employers_applicants(client, login_as, application_id):
+    login_as(EMPLOYER2)
+    other = client.get(f"/api/listings/{OPEN_LISTING}/applicants")
+    login_as(EMPLOYER)
+    owner = client.get(f"/api/listings/{OPEN_LISTING}/applicants")
+    login_as(ADMIN)
+    admin = client.get(f"/api/admin/listings/{OPEN_LISTING}/export")
 
     assert other.status_code == 403
     assert owner.status_code == 200
