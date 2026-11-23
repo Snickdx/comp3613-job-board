@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from sqlmodel import Session, select
@@ -22,14 +23,20 @@ def apply(
     user = get_user(graduate_id)
     if not user or user["role"] != "graduate":
         return {"ok": False, "error": "graduates only"}
-    # DEFECT: no programme eligibility check
+    if user.get("programme") != "DCIT":
+        return {"ok": False, "error": "DCIT graduates only"}
 
     with Session(engine) as session:
         listing = session.get(Listing, listing_id)
         if listing is None:
             return {"ok": False, "error": "listing not found"}
+        if listing.status != "published":
+            return {"ok": False, "error": "listing not published"}
+        if listing.deadline < date.today().isoformat():
+            return {"ok": False, "error": "listing expired"}
+        if listing.apply_mode == "external":
+            return {"ok": False, "error": "external listing; apply externally"}
 
-        # DEFECT: allows apply on pending / expired; external still creates a row
         resume = resume_text or user.get("resume_text") or ""
         application = Application(
             listing_id=listing_id,
@@ -112,7 +119,7 @@ def transition_application(
         return {
             "ok": False,
             "code": "unknown_action",
-            "error": f"action must be one of {ACTIONS}",
+            "error": f"unknown action {action!r}; expected one of {ACTIONS}",
         }
 
     with Session(engine) as session:
