@@ -58,7 +58,7 @@ The inherited `app/services/lifecycle.py` contains the following defects:
 | Defect | Effect | How the Pattern Fixes It |
 |--------|--------|--------------------------|
 | `apply_action()` allows Submitted → Shortlisted or Hired | Required stages are bypassed (Q28–Q30) | Each state class exposes only its own valid transitions, preventing skipped stages. |
-| A status string is stored alongside four boolean flags (`flag_reviewed`, `flag_shortlisted`, `flag_rejected`, `flag_hired`) | Records become inconsistent after status changes | The flags are removed through a migration, and status becomes the single source of truth. |
+| A status string is stored alongside four legacy boolean flags (`flag_reviewed`, `flag_shortlisted`, `flag_rejected`, `flag_hired`) | Records become inconsistent after status changes | Status remains the single source of truth; every successful transition synchronizes the legacy flags for schema compatibility. |
 | Rejected applications can be shortlisted or hired, and hired applications can be rejected | Final states are not final (Q8, Q24) | `RejectedState` and `HiredState` reject every action with an `InvalidTransitionError`. |
 | The `reopen` action resets the status to Submitted without clearing flags | Contradicts Q9 and corrupts data | The `reopen` action is removed because the requirements do not allow it. |
 | Some invalid actions return a success response without changing anything | Failures are silent (Q11) | Invalid transitions raise `InvalidTransitionError`, which the routes map to HTTP 409. |
@@ -119,7 +119,7 @@ A state-transition diagram will accompany the class diagram so the rules are vis
    - Verify that the acting user is the employer who owns the listing.
    - Delegate the transition to the current state object.
 
-6. **Remove redundant flags:** Remove the four boolean flags from the model and add a migration. Status becomes the single source of truth.
+6. **Synchronize redundant flags:** Preserve the four legacy flags for existing database compatibility, but derive them only after a successful state transition. Status remains the single source of truth.
 
 7. **Remove unsupported actions:** Delete the `reopen` action.
 
@@ -136,3 +136,83 @@ A state-transition diagram will accompany the class diagram so the rules are vis
    - Employer authorization
    - HTTP error responses
    - Data consistency
+
+---
+
+# Sprint 2 Pattern Evidence
+
+## 5. Implementation Evidence
+
+The State pattern is implemented on the `main` branch. The key implementation files are:
+
+- [app/services/application_states.py](../app/services/application_states.py)
+  defines `ApplicationState`, the five concrete state classes, `InvalidTransitionError`, and
+  `ApplicationStateFactory`.
+- [app/services/lifecycle.py](../app/services/lifecycle.py)
+  obtains the current state from the factory and delegates `mark_reviewed`, `shortlist`,
+  `reject`, and `hire`. It also refuses `reopen` explicitly and derives compatibility flags
+  after a successful transition.
+- [app/services/applications.py](../app/services/applications.py)
+  verifies that the actor is an employer and owns the application listing before changing
+  the application. Administrator and other-employer attempts are refused.
+- [app/routers/board.py](../app/routers/board.py)
+  maps invalid-transition failures to HTTP 409 and maps authorization failures to HTTP 403.
+- [app/models/application.py](../app/models/application.py)
+  stores the canonical `status` plus legacy database flags. A new status always synchronizes
+  those flags, preserving compatibility without allowing the status to drift.
+
+The lifecycle implementation follows the five-state transition table in Section 1.2. It does
+not include a skipped, backward, or terminal-to-active transition. `reopen` has no state
+transition implementation; it is explicitly refused as an unsupported action.
+
+## 6. Key Commits and Pull Requests
+
+| Evidence | Change |
+|----------|--------|
+| PR #10 / merge `969ed5d`, implementation commit `2b6d4da` | Introduced `ApplicationState`, concrete states, factory, lifecycle integration, and HTTP handling. |
+| PR #12 / merge `55248a1`, test commit `dc10ebc` | Added comprehensive lifecycle state and transition unit tests. |
+| Integration commit `f9e2e57` | Added HTTP/API integration coverage for ownership, 409 responses, final states, and flags. |
+| Compatibility commit `31de1b8` | Reconciled the State implementation with the existing application model and API. |
+| PR #13 / merge `b6355f5` | Added acceptance-gap fixes and integrated review feedback. |
+
+These links show pattern implementation and verification: PR #10, PR #12, and PR #13. A
+complete commit list is available locally with:
+
+```powershell
+git --no-pager log --merges -12 --date=short --pretty=format:"%h %ad %an %s"
+```
+
+## 7. Testing Evidence
+
+Command:
+
+```powershell
+py -3.14 -m pytest -q tests/test_lifecycle_states.py tests/test_lifecycle.py
+```
+
+Result:
+
+```text
+68 passed, 1 warning in 14.76s
+```
+
+The focused suite covers every factory state, all legal moves, skipped stages, backward and
+repeated moves, terminal states, `reopen`, unknown actions, listing ownership, administrator
+refusal, HTTP 409/403 responses, and status/flag consistency.
+
+## 8. Class Diagram Update
+
+The class diagram has been updated for Sprint 2. The updated implementation diagram is
+[class_diagram_jobboard_state_pattern.png](Diagrams/class_diagram_jobboard_state_pattern.png),
+and the earlier PNG remains at
+[class_diagram_jobboard.drawio.png](Diagrams/class_diagram_jobboard.drawio.png).
+
+The diagram now makes the implementation relationships explicit:
+
+- `ApplicationService` / `applications.transition_application()` authorizes the owner and
+  invokes the lifecycle service.
+- `lifecycle.apply_action()` obtains a state through `ApplicationStateFactory`.
+- `ApplicationStateFactory` creates one concrete state for the stored status.
+- Concrete states enforce their own allowed actions; final states inherit refusal behavior.
+- `InvalidTransitionError` is converted to HTTP 409 for invalid transitions.
+- `Application.status` is canonical, while legacy flags are maintained for compatibility.
