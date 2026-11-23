@@ -16,32 +16,90 @@ from app.services.application_states import (
     InvalidTransitionError,
 )
 
-ACTIONS = ("mark_reviewed", "shortlist", "reject", "hire")
+# Actions employers may attempt from the API.
+ACTIONS = (
+    "mark_reviewed",
+    "shortlist",
+    "reject",
+    "hire",
+    "reopen",  # always refused: rejected and hired are final
+)
+
+_ACTION_TO_METHOD = {
+    "mark_reviewed": "review",
+    "shortlist": "shortlist",
+    "reject": "reject",
+    "hire": "hire",
+}
 
 
-def apply_action(app: Any, action: str) -> dict[str, Any]:
-    """Apply a valid action, or return an HTTP-mappable transition error."""
+def snapshot(app: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": app["id"],
+        "status": app["status"],
+        "flag_reviewed": bool(app["flag_reviewed"]),
+        "flag_shortlisted": bool(app["flag_shortlisted"]),
+        "flag_rejected": bool(app["flag_rejected"]),
+        "flag_hired": bool(app["flag_hired"]),
+    }
+
+
+def _flags_for(app: dict[str, Any], new_status: str) -> dict[str, int]:
+    """Derive the legacy flags from the new status."""
+    return {
+        "flag_reviewed": 0 if new_status == "submitted" else 1,
+        "flag_shortlisted": 1
+        if new_status in ("shortlisted", "hired")
+        else int(app["flag_shortlisted"]),
+        "flag_rejected": 1 if new_status == "rejected" else 0,
+        "flag_hired": 1 if new_status == "hired" else 0,
+    }
+
+
+def apply_action(app: dict[str, Any], action: str) -> dict[str, Any]:
+    """
+    Apply an action to an application row.
+
+    Returns {"ok": True, "application", "row", "changed": True} on success.
+    Returns {"ok": False, "error", "code"} when refused; the application is
+    left unchanged. code is "unknown_action" or "invalid_transition".
+    """
     if action not in ACTIONS:
         return {
             "ok": False,
-            "code": "invalid_transition",
-            "error": f"cannot {action} an application that is {getattr(app, 'status', 'unknown')}",
+            "code": "unknown_action",
+            "error": f"unknown action {action!r}; expected one of {ACTIONS}",
         }
 
-    current_status = getattr(app, "status", "unknown")
     try:
-        state = ApplicationStateFactory.create(current_status)
-        new_status = state.transition(action)
+        state = ApplicationStateFactory.from_status(app["status"])
+        if action == "reopen":
+            raise InvalidTransitionError(
+                f"cannot reopen an application that is {state.name}"
+            )
+        new_status = getattr(state, _ACTION_TO_METHOD[action])()
     except InvalidTransitionError as exc:
         return {"ok": False, "code": "invalid_transition", "error": str(exc)}
 
-    app.status = new_status
-    app.flag_reviewed = int(new_status != "submitted")
-    app.flag_shortlisted = int(new_status in {"shortlisted", "hired"})
-    app.flag_rejected = int(new_status == "rejected")
-    app.flag_hired = int(new_status == "hired")
+    updated = dict(app)
+    updated["status"] = new_status
+    updated.update(_flags_for(app, new_status))
     return {
         "ok": True,
-        "application": app.model_dump(),
+        "application": snapshot(updated),
+        "row": updated,
         "changed": True,
     }
+
+
+def derived_status_from_flags(app: dict[str, Any]) -> str:
+    """Kept for compatibility. Now always agrees with `status`."""
+    if app["flag_hired"]:
+        return "hired"
+    if app["flag_rejected"]:
+        return "rejected"
+    if app["flag_shortlisted"]:
+        return "shortlisted"
+    if app["flag_reviewed"]:
+        return "reviewed"
+    return "submitted"

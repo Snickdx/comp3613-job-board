@@ -118,8 +118,8 @@ def transition_application(
     if action not in ACTIONS:
         return {
             "ok": False,
-            "code": "invalid_transition",
-            "error": f"cannot perform {action}; action must be one of {ACTIONS}",
+            "code": "unknown_action",
+            "error": f"unknown action {action!r}; expected one of {ACTIONS}",
         }
 
     with Session(engine) as session:
@@ -135,10 +135,16 @@ def transition_application(
         if listing is None or listing.employer_id != actor_id:
             return {"ok": False, "code": "forbidden", "error": "forbidden"}
 
-        result = apply_action(row, action)
+        result = apply_action(row.model_dump(), action)
         if not result.get("ok"):
             return result
 
+        updated = result["row"]
+        row.status = updated["status"]
+        row.flag_reviewed = updated["flag_reviewed"]
+        row.flag_shortlisted = updated["flag_shortlisted"]
+        row.flag_rejected = updated["flag_rejected"]
+        row.flag_hired = updated["flag_hired"]
         session.add(row)
         session.commit()
         session.refresh(row)

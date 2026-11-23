@@ -19,35 +19,26 @@ class InvalidTransitionError(Exception):
 class ApplicationState:
     name: str = ""
 
-    def _invalid(self, action: str) -> str:
-        raise InvalidTransitionError(f"cannot {action} an application that is {self.name}")
-
-    def transition(self, action: str) -> str:
-        return self._invalid(action)
+    def _refuse(self, action: str) -> str:
+        raise InvalidTransitionError(
+            f"cannot {action} an application that is {self.name}"
+        )
 
     def review(self) -> str:
-        return self._invalid("review")
+        return self._refuse("review")
 
     def shortlist(self) -> str:
-        return self._invalid("shortlist")
+        return self._refuse("shortlist")
 
     def reject(self) -> str:
-        return self._invalid("reject")
+        return self._refuse("reject")
 
     def hire(self) -> str:
-        return self._invalid("hire")
-
-    def _refuse(self, action: str) -> str:
-        return self._invalid(action)
+        return self._refuse("hire")
 
 
 class SubmittedState(ApplicationState):
     name = "submitted"
-
-    def transition(self, action: str) -> str:
-        if action == "mark_reviewed":
-            return "reviewed"
-        return self._invalid(action)
 
     def review(self) -> str:
         return ReviewedState.name
@@ -55,13 +46,6 @@ class SubmittedState(ApplicationState):
 
 class ReviewedState(ApplicationState):
     name = "reviewed"
-
-    def transition(self, action: str) -> str:
-        if action == "shortlist":
-            return "shortlisted"
-        if action == "reject":
-            return "rejected"
-        return self._invalid(action)
 
     def shortlist(self) -> str:
         return ShortlistedState.name
@@ -72,13 +56,6 @@ class ReviewedState(ApplicationState):
 
 class ShortlistedState(ApplicationState):
     name = "shortlisted"
-
-    def transition(self, action: str) -> str:
-        if action == "hire":
-            return "hired"
-        if action == "reject":
-            return "rejected"
-        return self._invalid(action)
 
     def hire(self) -> str:
         return HiredState.name
@@ -112,12 +89,8 @@ class ApplicationStateFactory:
     }
 
     @classmethod
-    def create(cls, status: str) -> ApplicationState:
+    def from_status(cls, status: str) -> ApplicationState:
         try:
             return cls._states[status]()
         except KeyError:
             raise InvalidTransitionError(f"unknown status {status!r}") from None
-
-    @classmethod
-    def from_status(cls, status: str) -> ApplicationState:
-        return cls.create(status)
