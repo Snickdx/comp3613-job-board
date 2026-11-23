@@ -106,7 +106,7 @@ def export_applicants(admin_id: int, listing_id: int) -> dict[str, Any]:
 def transition_application(
     actor_id: int, application_id: int, action: str
 ) -> dict[str, Any]:
-    """Drive the poorly factored lifecycle module."""
+    """Apply an employer-owned application transition through the State lifecycle."""
     actor = get_user(actor_id)
     if not actor:
         return {"ok": False, "code": "forbidden", "error": "unknown user"}

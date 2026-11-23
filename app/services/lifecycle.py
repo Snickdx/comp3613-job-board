@@ -7,6 +7,7 @@ from typing import Any
 from app.services.application_states import IllegalTransition, state_for
 
 ACTIONS = (
+    "review",
     "mark_reviewed",
     "shortlist",
     "reject",
