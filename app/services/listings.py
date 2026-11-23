@@ -106,4 +106,5 @@ def publish_listing(admin_id: int, listing_id: int) -> dict[str, Any]:
                 )
             )
         session.commit()
+        # Calling /notify afterward can notify the same subscribers again.
         return {"ok": True, "notified": True, "count": len(subs)}

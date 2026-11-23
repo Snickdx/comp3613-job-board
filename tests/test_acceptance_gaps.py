@@ -54,15 +54,33 @@ def test_employer_submission_starts_pending():
     assert response.json()["status"] == "pending"
 
 
-def test_external_expired_and_pending_listings_do_not_accept_applications():
-    dcit_id = uid("grad.dcit@example.com")
-    for listing_id in (2, 3):
-        response = client.post("/api/graduates/applications", json={
-            "listing_id": listing_id,
-            "cover_letter": "Application",
-            "actor_id": dcit_id,
-        })
-        assert response.status_code == 400
+def test_external_listing_does_not_accept_in_app_application():
+    publish = client.post("/api/admin/listings/2/publish", json={"actor_id": uid("admin@example.com")})
+    assert publish.status_code == 200
+    response = client.post("/api/graduates/applications", json={
+        "listing_id": 2,
+        "cover_letter": "Application",
+        "actor_id": uid("grad.dcit@example.com"),
+    })
+    assert response.status_code == 400
+
+
+def test_expired_listing_does_not_accept_application():
+    response = client.post("/api/graduates/applications", json={
+        "listing_id": 3,
+        "cover_letter": "Application",
+        "actor_id": uid("grad.dcit@example.com"),
+    })
+    assert response.status_code == 400
+
+
+def test_pending_listing_does_not_accept_application():
+    response = client.post("/api/graduates/applications", json={
+        "listing_id": 2,
+        "cover_letter": "Application",
+        "actor_id": uid("grad.dcit@example.com"),
+    })
+    assert response.status_code == 400
 
 
 def test_publishing_notifies_subscribers():

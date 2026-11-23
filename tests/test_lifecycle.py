@@ -2,7 +2,6 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect
 
 from app.main import app
 from app.seed import seed
