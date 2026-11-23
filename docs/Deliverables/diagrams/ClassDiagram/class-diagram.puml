@@ -169,11 +169,14 @@ package "Services (client of the pattern)" as Services {
     +submit_listing(...): dict
     +publish_listing(admin_id, listing_id): dict
     +notify_subscribers(admin_id, listing_id): dict
+    -_notify_eligible_subscribers(session, listing): int
   }
   note bottom of ListingService
     Eligibility (AC 8) and listing visibility
     (published + before deadline, AC 4/6).
     apply() also refuses external-link listings (AC 13).
+    New listings start pending (AC 4). publish_listing()
+    notifies eligible subscribers once (AC 7, A9/A10).
   end note
 }
 
@@ -250,6 +253,7 @@ package "Domain model" as Domain {
   class Notification <<entity>> {
     +id: int
     +user_id: int
+    +listing_id: int?
     +message: str
   }
 
@@ -258,6 +262,7 @@ package "Domain model" as Domain {
   Listing "1" -- "0..* " Application : receives
   User "1 graduate" -- "0..1" Subscription : subscribes
   User "1 recipient" -- "0..* " Notification : receives
+  Listing "1" -- "0..* " Notification : about
   Application --> ApplicationStatus
   User --> UserRole
 }
