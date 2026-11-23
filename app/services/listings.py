@@ -11,6 +11,7 @@ from app.database import engine
 from app.models.listing import Listing
 from app.models.notification import Notification
 from app.models.subscription import Subscription
+from app.models.user import User
 from app.services.board_auth import get_user
 
 ELIGIBLE_PROGRAMMES = {"DCIT"}
@@ -77,8 +78,8 @@ def submit_listing(
     if apply_mode == "external" and not external_url:
         return {"ok": False, "error": "external_url required"}
 
-    # DEFECT: published immediately (skip pending/admin)
-    status = "published"
+    # AC 4: new listings wait in the admin review queue until published (A8).
+    status = "pending"
     with Session(engine) as session:
         listing = Listing(
             employer_id=employer_id,
@@ -106,12 +107,14 @@ def publish_listing(admin_id: int, listing_id: int) -> dict[str, Any]:
             return {"ok": False, "error": "listing not found"}
         listing.status = "published"
         session.add(listing)
+        # AC 7: publishing notifies subscribers in the same step (A9).
+        notified = _notify_eligible_subscribers(session, listing)
         session.commit()
-    # DEFECT: publish does not notify subscribers
-    return {"ok": True, "notified": False}
+    return {"ok": True, "notified": notified}
 
 
 def notify_subscribers(admin_id: int, listing_id: int) -> dict[str, Any]:
+    """Manual re-send; safe to repeat because already-notified subscribers are skipped."""
     admin = get_user(admin_id)
     if not admin or admin["role"] != "admin":
         return {"ok": False, "error": "admin only"}
@@ -119,13 +122,33 @@ def notify_subscribers(admin_id: int, listing_id: int) -> dict[str, Any]:
         listing = session.get(Listing, listing_id)
         if listing is None:
             return {"ok": False, "error": "listing not found"}
-        subs = session.exec(select(Subscription)).all()
-        for sub in subs:
-            session.add(
-                Notification(
-                    user_id=sub.graduate_id,
-                    message=f"New job published: {listing.title} at {listing.company}",
-                )
-            )
+        if listing.status != "published":
+            return {"ok": False, "error": "listing is not published"}
+        count = _notify_eligible_subscribers(session, listing)
         session.commit()
-        return {"ok": True, "count": len(subs)}
+        return {"ok": True, "count": count}
+
+
+def _notify_eligible_subscribers(session: Session, listing: Listing) -> int:
+    """Notify each eligible subscriber about this listing once (AC 7, AC 8; A10)."""
+    already_notified = set(
+        session.exec(
+            select(Notification.user_id).where(Notification.listing_id == listing.id)
+        ).all()
+    )
+    count = 0
+    for sub in session.exec(select(Subscription)).all():
+        if sub.graduate_id in already_notified:
+            continue
+        graduate = session.get(User, sub.graduate_id)
+        if graduate is None or not is_eligible_graduate(graduate.model_dump()):
+            continue
+        session.add(
+            Notification(
+                user_id=sub.graduate_id,
+                listing_id=listing.id,
+                message=f"New job published: {listing.title} at {listing.company}",
+            )
+        )
+        count += 1
+    return count
