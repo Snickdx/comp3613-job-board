@@ -11,7 +11,7 @@ Evidence used in this document:
 | Interview transcript (timestamps cited below) | [Interviews/InterviewChat.txt](../Interviews/InterviewChat.txt) |
 | Requirements (FR/NFR IDs cited below) | [Requirements/Job Board Requirements & Interview Traceability.md](<Job Board Requirements & Interview Traceability.md>) |
 | Public acceptance criteria (AC numbers) | [Requirements/ACCEPTANCE.md](ACCEPTANCE.md) |
-| Proposed class diagram (State pattern) | [diagrams/ClassDiagram/ClassDiagram.png](../diagrams/ClassDiagram/ClassDiagram.png) ([source](../diagrams/ClassDiagram/class-diagram.puml)) |
+| Proposed class diagram (State pattern) | [diagrams/ClassDiagram/ClassDiagram_Sprint1.png](../diagrams/ClassDiagram/ClassDiagram_Sprint1.png) ([source](../diagrams/ClassDiagram/class-diagram_Sprint1.puml)) |
 
 Interview citations use the same format as the requirements document, e.g. *Item 3 (Employer) @ 07:47 AM*.
 
@@ -90,7 +90,7 @@ instead of silently succeeding.
 
 ### Mapping to the class diagram
 
-The [proposed class diagram](../diagrams/ClassDiagram/ClassDiagram.png) shows the same design:
+The [proposed class diagram](../diagrams/ClassDiagram/ClassDiagram_Sprint1.png) shows the same design:
 
 | In this rationale | In the class diagram |
 |---|---|

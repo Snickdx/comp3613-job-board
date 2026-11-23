@@ -1,8 +1,8 @@
 # Sprint 2 #12 — Pattern Evidence: State pattern in the application lifecycle
 
 This note shows that the State pattern described in the Sprint 1
-[Pattern Rationale](../../Requirements/PatternRationale.md) and
-[class diagram](../../diagrams/ClassDiagram/class-diagram.puml) is now in the code.
+[Pattern Rationale](../Requirements/PatternRationale.md) and
+[class diagram](../diagrams/ClassDiagram/ClassDiagram_Sprint1.png) is now in the code.
 It links each pattern role to a file and a PR, shows the before and after code, and lists the
 tests that prove the inherited defects D1–D7 are fixed.
 
@@ -97,7 +97,8 @@ app/services/lifecycle.py            81%
 TOTAL                                93%
 ```
 
-Screenshot: [9-SC1](../9_Regression_Tests/9-SC1.png) shows the regression test run from the S2-#9 PR.
+Screenshots: [9-SC1](9_Regression_Tests/9-SC1.png) shows the regression test run from the S2-#9 PR, and
+[9-SC2](9_Regression_Tests/9-SC2.png) shows the full suite (58 passed) after session auth (PR #25).
 
 ## 6. Differences from the Sprint 1 class diagram
 
@@ -111,4 +112,9 @@ The code follows the diagram's design, with these implementation differences:
 | `SubmittedState.review()` only | `review()` and `mark_reviewed()` | `mark_reviewed` is kept as an alias so the inherited API action still works |
 | `ApplicationRepository` | Direct `Session` queries in the service | No repository layer exists for applications in the starter |
 
-The class diagram should be updated to match these names as the second half of S2-#12.
+The class diagram has been updated to match these names (S2-#12, PR #23 and PR #26):
+[ClassDiagram.png](../diagrams/ClassDiagram/ClassDiagram.png)
+([source](../diagrams/ClassDiagram/class-diagram.puml)). The Sprint 1 version is kept as
+[ClassDiagram_Sprint1.png](../diagrams/ClassDiagram/ClassDiagram_Sprint1.png) for comparison.
+The pattern itself (five states, the legal transitions, `IllegalTransition`, one stored `status`)
+is unchanged from the Sprint 1 design.
