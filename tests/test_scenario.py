@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.seed import seed
-
+from app.utilities.security import access_token_cookie_kwargs, create_access_token
 
 def setup_module() -> None:
     seed(reset=True)
@@ -28,6 +28,9 @@ def test_api_login_seed_admin():
     )
     assert r.status_code == 200
     assert r.json()["user"]["role"] == "admin"
+    
+    #token retrieval 
+    assert r.cookies.get("access_token")
 
 
 def test_jobs_endpoint_returns_list():
