@@ -10,7 +10,7 @@ from app.database import engine
 from app.models.application import Application
 from app.models.listing import Listing
 from app.services.board_auth import get_user
-from app.services.lifecycle import ACTIONS, apply_action, derived_status_from_flags
+from app.services.lifecycle import ACTIONS, apply_action
 
 
 def apply(
@@ -53,20 +53,14 @@ def apply(
 
 
 def my_applications(graduate_id: int) -> list[dict[str, Any]]:
+    """Graduates always see the single canonical status column."""
     with Session(engine) as session:
         rows = session.exec(
             select(Application)
             .where(Application.graduate_id == graduate_id)
             .order_by(Application.id)
         ).all()
-        results = []
-        for row in rows:
-            app = row.model_dump()
-            # DEFECT: graduate view sometimes uses flag-derived status, not column
-            view = dict(app)
-            view["status"] = derived_status_from_flags(app)
-            results.append(view)
-        return results
+        return [row.model_dump() for row in rows]
 
 
 def listing_applicants(viewer_id: int, listing_id: int) -> dict[str, Any]:
@@ -77,8 +71,10 @@ def listing_applicants(viewer_id: int, listing_id: int) -> dict[str, Any]:
         listing = session.get(Listing, listing_id)
         if listing is None:
             return {"ok": False, "error": "listing not found"}
-        # DEFECT (IDOR): ownership not checked for employers
         if viewer["role"] not in {"employer", "admin"}:
+            return {"ok": False, "error": "forbidden"}
+        # Employers may only see applicants of their own listings.
+        if viewer["role"] == "employer" and listing.employer_id != viewer_id:
             return {"ok": False, "error": "forbidden"}
         rows = session.exec(
             select(Application)
@@ -101,30 +97,40 @@ def export_applicants(admin_id: int, listing_id: int) -> dict[str, Any]:
 def transition_application(
     actor_id: int, application_id: int, action: str
 ) -> dict[str, Any]:
-    """Drive the poorly factored lifecycle module."""
+    """Change an application's status through the State-pattern lifecycle.
+
+    Only the employer who owns the listing may do this. Administrators and
+    other employers are refused. Every failure carries a `code` that the
+    route maps to an HTTP status.
+    """
     actor = get_user(actor_id)
     if not actor:
-        return {"ok": False, "error": "unknown user"}
-    # DEFECT: admin may transition; any employer may transition any application
-    if actor["role"] not in {"employer", "admin"}:
-        return {"ok": False, "error": "forbidden"}
+        return {"ok": False, "code": "unauthorized", "error": "unknown user"}
+    if actor["role"] != "employer":
+        return {"ok": False, "code": "forbidden", "error": "forbidden"}
     if action not in ACTIONS:
-        return {"ok": False, "error": f"action must be one of {ACTIONS}"}
+        return {
+            "ok": False,
+            "code": "unknown_action",
+            "error": f"action must be one of {ACTIONS}",
+        }
 
     with Session(engine) as session:
         row = session.get(Application, application_id)
         if row is None:
-            return {"ok": False, "error": "application not found"}
+            return {
+                "ok": False,
+                "code": "not_found",
+                "error": "application not found",
+            }
+
+        listing = session.get(Listing, row.listing_id)
+        if listing is None or listing.employer_id != actor_id:
+            return {"ok": False, "code": "forbidden", "error": "forbidden"}
 
         result = apply_action(row.model_dump(), action)
         if not result.get("ok"):
             return result
-        if not result.get("changed"):
-            return {
-                "ok": True,
-                "application": result["application"],
-                "changed": False,
-            }
 
         updated = result["row"]
         row.status = updated["status"]
