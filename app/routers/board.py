@@ -150,16 +150,17 @@ def applicants(listing_id: int, user: AuthDep) -> dict[str, Any]:
 
 @router.get("/admin/listings/{listing_id}/export")
 def export(listing_id: int, user : AdminDep) -> dict[str, Any]:
-    result = applications.export_applicants(user._id, listing_id)
+    result = applications.export_applicants(user.id, listing_id)
     if not result.get("ok"):
         raise_for_error(result)
     return result
 
-
 @router.post("/applications/{application_id}/transition")
-def transition(application_id: int, body: TransitionBody) -> dict[str, Any]:
+def transition(
+    application_id: int, user: AuthDep, body: TransitionBody
+) -> dict[str, Any]:
     result = applications.transition_application(
-        body.actor_id, application_id, body.action
+        user.id, application_id, body.action
     )
     if not result.get("ok"):
         raise_for_error(result)
