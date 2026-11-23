@@ -140,3 +140,44 @@ def test_application_model_has_only_status_for_lifecycle():
 
     assert "status" in fields
     assert not any(field.startswith("flag_") for field in fields)
+
+
+@pytest.mark.parametrize(
+    ("status", "action", "expected_status"),
+    [
+        ("submitted", "review", "reviewed"),
+        ("submitted", "mark_reviewed", "reviewed"),
+        ("reviewed", "shortlist", "shortlisted"),
+        ("reviewed", "reject", "rejected"),
+        ("shortlisted", "hire", "hired"),
+        ("shortlisted", "reject", "rejected"),
+        ("rejected", "reopen", "reviewed"),
+    ],
+)
+def test_apply_action_routes_through_state(status, action, expected_status):
+    from app.services.lifecycle import apply_action
+
+    result = apply_action({"id": 1, "status": status}, action)
+
+    assert result["ok"] is True
+    assert result["changed"] is True
+    assert result["application"]["status"] == expected_status
+    assert result["row"]["status"] == expected_status
+
+
+@pytest.mark.parametrize(
+    ("status", "action"),
+    [
+        ("submitted", "hire"),
+        ("reviewed", "hire"),
+        ("rejected", "shortlist"),
+        ("hired", "reopen"),
+    ],
+)
+def test_apply_action_refuses_illegal_transition(status, action):
+    from app.services.lifecycle import apply_action
+
+    result = apply_action({"id": 1, "status": status}, action)
+
+    assert result["ok"] is False
+    assert result["code"] == "illegal_transition"
