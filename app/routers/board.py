@@ -138,11 +138,23 @@ def export(listing_id: int, actor_id: int) -> dict[str, Any]:
     return result
 
 
+_STATUS_BY_CODE = {
+    "unauthorized": 401,
+    "forbidden": 403,
+    "not_found": 404,
+    "unknown_action": 400,
+    "invalid_transition": 409,
+}
+
+
 @router.post("/applications/{application_id}/transition")
 def transition(application_id: int, body: TransitionBody) -> dict[str, Any]:
     result = applications.transition_application(
         body.actor_id, application_id, body.action
     )
     if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise HTTPException(
+            status_code=_STATUS_BY_CODE.get(result.get("code"), 400),
+            detail=result.get("error"),
+        )
     return result
