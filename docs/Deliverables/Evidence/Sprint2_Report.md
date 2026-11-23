@@ -68,7 +68,7 @@ team did not change (server configuration pages, PDF/transcript export, CLI, HTM
 - Coverage: [`14-SC1.png`](./14_Coverage/14-SC1.png) and [`Coverage_Report.md`](./Coverage_Report.md)
 - Fix evidence: [`10_Eligibility_Rules/`](./10_Eligibility_Rules/), [`8_Error_Status_Codes/`](./8_Error_Status_Codes/), [`7_listing-ownership/`](./7_listing-ownership/), [`13_Listing_Review/`](./13_Listing_Review/)
 - State-pattern implementation details and defect-to-test mapping: [`PatternEvidence.md`](./PatternEvidence.md)
-- Updated class diagram: [`ClassDiagram.png`](../diagrams/ClassDiagram/ClassDiagram.png) ([source](../diagrams/ClassDiagram/class-diagram.puml)); Sprint 1 version kept as [`ClassDiagram_Sprint1.png`](../diagrams/ClassDiagram/ClassDiagram_Sprint1.png)
+- Updated class diagram: [`plantuml-diagramSprint2.png`](../diagrams/ClassDiagram/plantuml-diagramSprint2.png) ([source](../diagrams/ClassDiagram/class-diagram_Sprint2.puml)); Sprint 1 version kept as [`ClassDiagram_Sprint1.png`](../diagrams/ClassDiagram/ClassDiagram_Sprint1.png)
 
 ## Planning (done at the beginning)
 
