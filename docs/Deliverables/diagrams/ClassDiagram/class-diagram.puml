@@ -214,7 +214,7 @@ package "Domain model" as Domain {
     +id: int
     +username: str
     +email: str
-    +password: str (hashed)
+    {field} +password: str (hashed)
     +role: UserRole
     +programme: str?
     +field_preference: str?
@@ -226,9 +226,9 @@ package "Domain model" as Domain {
     +title: str
     +company: str
     +description: str
-    +apply_mode: str (collect | external)
+    {field} +apply_mode: str (collect | external)
     +external_url: str?
-    +deadline: str (ISO date)
+    {field} +deadline: str (ISO date)
     +status: str
   }
   class Application <<entity>> {
