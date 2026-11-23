@@ -41,7 +41,7 @@ class ApplyBody(BaseModel):
 
 class TransitionBody(BaseModel):
     action: str = Field(
-        description="mark_reviewed | shortlist | reject | hire | reopen"
+        description="mark_reviewed | shortlist | reject | hire"
     )
     actor_id: int
 

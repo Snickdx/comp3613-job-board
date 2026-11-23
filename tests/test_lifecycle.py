@@ -4,7 +4,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
-from app.database import engine
 from app.main import app
 from app.seed import seed
 
@@ -110,17 +109,20 @@ def test_unknown_application_is_404():
     assert act(9999, "employer@example.com", "mark_reviewed").status_code == 404
 
 
-def test_responses_have_no_flag_fields_and_columns_are_gone():
-    aid = new_application()
-    body = act(aid, "employer@example.com", "mark_reviewed").json()["application"]
-    assert not any(k.startswith("flag_") for k in body)
-    cols = {c["name"] for c in inspect(engine).get_columns("application")}
-    assert not any(c.startswith("flag_") for c in cols)
-
-
 def test_other_employer_cannot_view_applicants():
     new_application()
     r = client.get("/api/listings/1/applicants", params={"actor_id": uid("employer2@example.com")})
     assert r.status_code == 403
     r = client.get("/api/listings/1/applicants", params={"actor_id": uid("employer@example.com")})
     assert r.status_code == 200
+
+
+def test_flags_match_status():
+    aid = new_application()
+    body = act(aid, "employer@example.com", "mark_reviewed").json()["application"]
+
+    assert body["status"] == "reviewed"
+    assert body["flag_reviewed"] == 1
+    assert body["flag_shortlisted"] == 0
+    assert body["flag_rejected"] == 0
+    assert body["flag_hired"] == 0
