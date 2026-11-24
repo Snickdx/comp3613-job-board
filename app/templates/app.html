@@ -11,4 +11,22 @@
   <a href="/docs">Open API docs</a>
   <a class="secondary" href="/api/jobs">List jobs</a>
 </div>
+
+<section class="application-tracking" id="applications" aria-labelledby="applications-heading">
+  <div class="application-tracking-heading">
+    <div>
+      <p class="application-eyebrow">Graduate applications</p>
+      <h2 id="applications-heading">My applications</h2>
+    </div>
+  </div>
+
+  <div id="application-status" class="application-status" role="status" aria-live="polite">
+    Loading your applications...
+  </div>
+  <div class="application-list" id="application-list"></div>
+</section>
+{% endblock %}
+
+{% block subpage_scripts %}
+<script src="{{ url_for('static', path='js/app.js') }}" defer></script>
 {% endblock %}

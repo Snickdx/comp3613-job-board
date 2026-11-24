@@ -143,6 +143,9 @@ def cmd_users(args: argparse.Namespace) -> None:
     from sqlmodel import select
 
     from app.database import get_cli_session
+    from app.models.admin import Admin
+    from app.models.employer import Employer
+    from app.models.graduate import Graduate
     from app.models.user import User
 
     _ensure_models_loaded()
@@ -152,9 +155,17 @@ def cmd_users(args: argparse.Namespace) -> None:
             print("No users found. Run: python manage.py init")
             return
         for user in users:
+            if session.get(Admin, user.id) is not None:
+                role = "admin"
+            elif session.get(Graduate, user.id) is not None:
+                role = "graduate"
+            elif session.get(Employer, user.id) is not None:
+                role = "employer"
+            else:
+                role = "unknown"
             print(
                 f"  id={user.id}  username={user.username}  "
-                f"role={user.role}  email={user.email}"
+                f"role={role}  email={user.email}"
             )
 
 

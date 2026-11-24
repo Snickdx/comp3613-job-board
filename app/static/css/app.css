@@ -361,3 +361,129 @@ a {
   color: var(--brand-ink);
   border: 1px solid color-mix(in srgb, var(--brand-ink) 25%, transparent);
 }
+
+.application-tracking {
+  margin-top: 2.25rem;
+}
+
+.application-tracking-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.application-tracking-heading h2 {
+  margin: 0;
+  font-family: var(--brand-font-display);
+  letter-spacing: -0.03em;
+}
+
+.application-eyebrow {
+  margin: 0 0 0.25rem !important;
+  color: var(--brand-accent-2) !important;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.application-status {
+  min-height: 1.25rem;
+  color: var(--brand-muted);
+  font-size: 0.9rem;
+}
+
+.application-status.is-error {
+  color: #9b2c2c;
+}
+
+.application-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.application-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.65fr);
+  gap: 1rem;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent);
+  border-radius: var(--brand-radius);
+  padding: 1rem;
+}
+
+.application-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.application-company {
+  margin: 0.25rem 0 0 !important;
+  font-size: 0.9rem;
+}
+
+.application-card-status {
+  text-align: right;
+}
+
+.application-card-status p {
+  margin: 0.35rem 0 0;
+  max-width: none;
+  font-size: 0.86rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.62rem;
+  background: #dde4ea;
+  color: #35404b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.status-applied { background: #dceaf8; color: #285778; }
+.status-reviewed { background: #e2e7fb; color: #46528a; }
+.status-shortlisted { background: #dff2dc; color: #35652f; }
+.status-interview { background: #fff0c9; color: #755819; }
+.status-offered { background: #e4f2bf; color: #4e651c; }
+.status-hired { background: #c8f135; color: #31410f; }
+.status-rejected { background: #f3dadd; color: #84363e; }
+.status-withdrawn { background: #e1e3e5; color: #5a6065; }
+
+.application-empty {
+  border: 1px dashed color-mix(in srgb, var(--brand-ink) 24%, transparent);
+  border-radius: var(--brand-radius);
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.application-empty h3 {
+  margin: 0 0 0.35rem;
+}
+
+.application-empty p {
+  margin-bottom: 0.75rem;
+}
+
+.application-empty a {
+  display: inline-flex;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--brand-ink);
+  border-radius: var(--brand-radius);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+@media (max-width: 640px) {
+  .application-card {
+    grid-template-columns: 1fr;
+  }
+
+  .application-card-status {
+    text-align: left;
+  }
+}

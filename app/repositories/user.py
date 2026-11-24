@@ -1,5 +1,8 @@
 from sqlmodel import Session, select, func
 from app.models.user import UserBase, User
+from app.models.admin import Admin
+from app.models.employer import Employer
+from app.models.graduate import Graduate
 from typing import Optional, Tuple
 from app.utilities.pagination import Pagination
 from app.schemas.user import UserUpdate
@@ -11,10 +14,19 @@ class UserRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, user_data: UserBase) -> Optional[User]:
+    def create(
+        self,
+        user_data: UserBase,
+        user_model: type[Admin] | type[Employer] | type[Graduate] = Graduate,
+    ) -> Optional[User]:
         try:
-            user_db = User.model_validate(user_data)
+            data = user_data.model_dump()
+            user_db = User.model_validate(data)
             self.db.add(user_db)
+            self.db.flush()
+
+            child_data = dict(data, id=user_db.id)
+            self.db.add(user_model.model_validate(child_data))
             self.db.commit()
             self.db.refresh(user_db)
             return user_db

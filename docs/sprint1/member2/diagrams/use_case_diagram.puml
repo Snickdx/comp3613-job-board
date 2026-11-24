@@ -1,0 +1,66 @@
+@startuml
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam actorBorderColor #1B365D
+skinparam actorFontColor #1E232D
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #1B365D
+skinparam usecaseFontColor #1E232D
+skinparam rectangleBorderColor #1B365D
+skinparam rectangleBackgroundColor #F8FAFC
+skinparam arrowColor #1B365D
+
+actor "Job Board Administrator" as Admin
+actor Employer
+actor "Graduate Applicant" as Applicant
+
+rectangle "Graduate Job Board" as System {
+  usecase "Review, approve or reject listing" as ReviewListings
+  usecase "Publish listing" as PublishListing
+  usecase "Unpublish inappropriate listing" as UnpublishListing
+  usecase "Enforce student eligibility\nrestrictions" as EnforceEligibility
+  usecase "Export applicant package" as ExportApplicants
+  usecase "Notify eligible subscribers" as NotifySubscribers
+
+  usecase "Create, submit or revise listing" as ManageListing
+  usecase "Review applications and update status\nfor own listings" as ManageApplications
+  usecase "Notify applicant of status change" as NotifyStatusChange
+
+  usecase "Create and manage profile" as ManageProfile
+  usecase "Browse published jobs" as BrowseJobs
+  usecase "Apply for a job" as ApplyForJob
+  usecase "Submit on-platform application\n(cover letter and resume)" as OnPlatformApply
+  usecase "Continue to external application" as ExternalApply
+  usecase "Manage job subscriptions" as ManageSubscriptions
+  usecase "Subscribe to notifications" as Subscribe
+  usecase "Receive notification" as ReceiveNotification
+  usecase "Track application status" as TrackApplication
+}
+
+Admin --> ReviewListings
+Admin --> PublishListing
+Admin --> UnpublishListing
+Admin --> EnforceEligibility
+Admin --> ExportApplicants
+
+Employer --> ManageListing
+Employer --> ManageApplications
+
+Applicant --> ManageProfile
+Applicant --> BrowseJobs
+Applicant --> ApplyForJob
+Applicant --> ManageSubscriptions
+Applicant --> Subscribe
+Applicant --> ReceiveNotification
+Applicant --> TrackApplication
+
+PublishListing ..> NotifySubscribers : <<include>>
+NotifySubscribers ..> ReceiveNotification : <<include>>
+ManageApplications ..> NotifyStatusChange : <<include>>
+NotifyStatusChange ..> ReceiveNotification : <<include>>
+ApplyForJob ..> EnforceEligibility : <<include>>
+Subscribe ..> EnforceEligibility : <<include>>
+OnPlatformApply ..> ApplyForJob : <<extend>>\n[on-platform listing]
+ExternalApply ..> ApplyForJob : <<extend>>\n[external-link listing]
+@enduml

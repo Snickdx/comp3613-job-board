@@ -6,6 +6,7 @@ from app.services.auth_service import AuthService
 from app.repositories.user import UserRepository
 from app.utilities.flash import flash
 from app.utilities.security import access_token_cookie_kwargs
+from app.models.admin import Admin
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -34,7 +35,11 @@ async def login_action_ajax(
         )
 
     user = user_repo.get_by_username(username)
-    dest = "admin_home_view" if user and user.role == "admin" else "user_home_view"
+    if user:
+        admin = db.get(Admin, user.id)
+    else:
+        admin = None
+    dest = "admin_home_view" if admin else "user_home_view"
     response = RedirectResponse(
         url=request.url_for(dest),
         status_code=status.HTTP_303_SEE_OTHER,

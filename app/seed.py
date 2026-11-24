@@ -7,32 +7,36 @@ from sqlmodel import Session, select
 from app.database import drop_all, ensure_db_and_tables, engine
 from app.models.listing import Listing
 from app.models.subscription import Subscription
+from app.models.admin import Admin
+from app.models.employer import Employer
+from app.models.graduate import Graduate
 from app.models.user import User
+from app.repositories.user import UserRepository
 from app.utilities.security import encrypt_password
 
 USERS = [
-    # username, email, password, role, programme, field, resume
-    ("admin", "admin@example.com", "admin-dev", "admin", None, None, None),
+    # child model, username, email, password, programme, field, resume
+    (Admin, "admin", "admin@example.com", "admin-dev", None, None, None),
     (
+        Graduate,
         "grad.dcit",
         "grad.dcit@example.com",
         "grad-dev",
-        "graduate",
         "DCIT",
         "software",
         "DCIT graduate resume - Python, web.",
     ),
     (
+        Graduate,
         "grad.other",
         "grad.other@example.com",
         "grad-dev",
-        "graduate",
         "OTHER",
         "biology",
         "Non-DCIT resume.",
     ),
-    ("employer", "employer@example.com", "employer-dev", "employer", None, None, None),
-    ("employer2", "employer2@example.com", "employer-dev", "employer", None, None, None),
+    (Employer, "employer", "employer@example.com", "employer-dev", None, None, None),
+    (Employer, "employer2", "employer2@example.com", "employer-dev", None, None, None),
 ]
 
 
@@ -54,25 +58,26 @@ def seed(*, reset: bool = False) -> None:
             # Tables were dropped above; continue to insert.
             pass
 
-        for username, email, password, role, programme, field, resume in USERS:
-            session.add(
-                User(
-                    username=username,
-                    email=email,
-                    password=encrypt_password(password),
-                    role=role,
+        repo = UserRepository(session)
+        for user_model, username, email, password, programme, field, resume in USERS:
+            data = {
+                "username": username,
+                "email": email,
+                "password": encrypt_password(password),
+            }
+            if user_model is Graduate:
+                data.update(
                     programme=programme,
                     field_preference=field,
                     resume_text=resume,
                 )
-            )
-        session.commit()
+            repo.create(user_model.model_validate(data), user_model=user_model)
 
         employer = session.exec(
-            select(User).where(User.email == "employer@example.com")
+            select(Employer).where(Employer.email == "employer@example.com")
         ).one()
         employer2 = session.exec(
-            select(User).where(User.email == "employer2@example.com")
+            select(Employer).where(Employer.email == "employer2@example.com")
         ).one()
 
         session.add_all(
@@ -112,7 +117,7 @@ def seed(*, reset: bool = False) -> None:
         session.commit()
 
         grad = session.exec(
-            select(User).where(User.email == "grad.dcit@example.com")
+            select(Graduate).where(Graduate.email == "grad.dcit@example.com")
         ).one()
         session.add(Subscription(graduate_id=grad.id))
         session.commit()

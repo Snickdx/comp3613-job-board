@@ -1,0 +1,139 @@
+@startuml
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #1B365D
+skinparam classFontColor #1E232D
+skinparam packageBorderColor #1B365D
+skinparam packageBackgroundColor #F8FAFC
+skinparam arrowColor #1B365D
+
+package "Accounts and Job Board" {
+  abstract class Account {
+    +id: int
+    +username: String
+    +email: String
+    -passwordHash: String
+  }
+
+  class JobBoardAdministrator
+  class Employer
+  class GraduateApplicant
+
+  class GraduateProfile {
+    +programme: String
+    +fieldPreference: String
+    +resumeRef: String
+  }
+
+  class JobListing {
+    +id: int
+    +title: String
+    +company: String
+    +description: String
+    +deadline: Date
+    +applyMode: ApplyMode
+    +externalUrl: String?
+    +status: ListingStatus
+  }
+
+  class Subscription {
+    +id: int
+    +active: Boolean
+  }
+
+  class Notification {
+    +id: int
+    +message: String
+    +createdAt: DateTime
+    +type: NotificationType
+  }
+
+  enum ApplyMode {
+    OnPlatform
+    ExternalLink
+  }
+
+  enum ListingStatus {
+    Pending
+    Approved
+    Rejected
+    Published
+    Unpublished
+  }
+
+  enum NotificationType {
+    ListingPublished
+    ApplicationStatusChanged
+  }
+
+  Account <|-- JobBoardAdministrator
+  Account <|-- Employer
+  Account <|-- GraduateApplicant
+  GraduateApplicant "1" *-- "1" GraduateProfile : maintains
+  Employer "1" -- "0..*" JobListing : owns
+  GraduateApplicant "1" -- "0..1" Subscription : manages
+  GraduateApplicant "1" -- "0..*" Notification : receives
+  JobListing "0..1" -- "0..*" Notification : publication generates
+}
+
+package "Application Lifecycle - State Pattern" {
+  class Application {
+    +id: int
+    +coverLetter: String
+    +resumeRef: String
+    +createdAt: DateTime
+    -currentState: ApplicationState
+    +status(): ApplicationStatus
+    +review(): void
+    +shortlist(): void
+    +hire(): void
+    +reject(): void
+  }
+
+  interface ApplicationState {
+    +status(): ApplicationStatus
+    +review(application: Application): void
+    +shortlist(application: Application): void
+    +hire(application: Application): void
+    +reject(application: Application): void
+  }
+
+  class SubmittedState
+  class ReviewedState
+  class ShortlistedState
+  class HiredState
+  class RejectedState
+  class WithdrawnState
+
+  enum ApplicationStatus {
+    Submitted
+    Reviewed
+    Shortlisted
+    Hired
+    Rejected
+    Withdrawn
+  }
+
+  Application *-- "1" ApplicationState : current state
+  ApplicationState ..> ApplicationStatus : reports
+  ApplicationState <|.. SubmittedState
+  ApplicationState <|.. ReviewedState
+  ApplicationState <|.. ShortlistedState
+  ApplicationState <|.. HiredState
+  ApplicationState <|.. RejectedState
+  ApplicationState <|.. WithdrawnState
+
+  SubmittedState ..> ReviewedState : review
+  ReviewedState ..> ShortlistedState : shortlist
+  ShortlistedState ..> HiredState : hire
+  ShortlistedState ..> RejectedState : reject
+}
+
+GraduateApplicant "1" -- "0..*" Application : submits on-platform
+JobListing "1" -- "0..*" Application : receives on-platform applications
+Application "0..1" -- "0..*" Notification : status updates
+
+@enduml
