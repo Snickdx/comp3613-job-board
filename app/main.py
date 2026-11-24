@@ -13,6 +13,16 @@ from app.routers import api_router, router, static_files, templates
 logger = logging.getLogger(__name__)
 
 
+def api_docs_options(env: str) -> dict[str, str | None]:
+    if env.lower() in {"dev", "development"}:
+        return {
+            "docs_url": "/docs",
+            "redoc_url": "/redoc",
+            "openapi_url": "/openapi.json",
+        }
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.seed import seed
@@ -23,6 +33,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
+    **api_docs_options(get_settings().env),
     middleware=[
         Middleware(SessionMiddleware, secret_key=get_settings().secret_key)
     ],
@@ -41,7 +52,7 @@ async def recover_uninitialized_db(request: Request, call_next):
 
     try:
         return await call_next(request)
-    except Exception as exc:  # noqa: BLE001 — catch then re-raise if not DB init
+    except Exception as exc:
         if not recover_if_uninitialized(exc):
             raise
         logger.info("Retrying %s after database init", request.url.path)

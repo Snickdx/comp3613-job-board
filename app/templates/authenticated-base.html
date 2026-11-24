@@ -6,7 +6,7 @@
     <a class="brand-wordmark" href="{{ url_for('index_view') }}">HireBoard</a>
     <nav class="app-topnav" aria-label="App">
       <a class="{{ 'is-active' if request.url.path.startswith('/app') }}" href="{{ url_for('user_home_view') }}">Home</a>
-      <a href="/docs">API docs</a>
+      <a class="{{ 'is-active' if request.url.path.startswith('/jobs') }}" href="{{ url_for('jobs_view') }}">Jobs</a>
       <a href="{{ url_for('logout') }}">Sign out</a>
       <span>{{ user.username }}</span>
     </nav>

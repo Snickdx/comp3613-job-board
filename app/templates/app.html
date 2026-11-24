@@ -4,11 +4,9 @@
 {% block subpage_content %}
 <h1>Board home</h1>
 <p>
-  Explore the job-board JSON API, then map routes to stakeholder needs.
-  Seeded listings and applications are ready after <code>python manage.py init</code>.
+  Find current job openings and manage your HireBoard account.
 </p>
 <div class="app-actions">
-  <a href="/docs">Open API docs</a>
-  <a class="secondary" href="/api/jobs">List jobs</a>
+  <a href="{{ url_for('jobs_view') }}">Browse jobs</a>
 </div>
 {% endblock %}

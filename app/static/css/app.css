@@ -361,3 +361,51 @@ a {
   color: var(--brand-ink);
   border: 1px solid color-mix(in srgb, var(--brand-ink) 25%, transparent);
 }
+
+.job-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.job-card {
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--brand-ink) 18%, transparent);
+  border-radius: var(--brand-radius);
+  background: #fff;
+}
+
+.job-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.job-card h2 {
+  font-family: var(--brand-font-display);
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.job-card-heading span,
+.job-card-footer {
+  color: var(--brand-muted);
+}
+
+.job-card p {
+  margin: 0.9rem 0;
+}
+
+.job-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.job-empty-state {
+  padding: 1.25rem;
+  border: 1px dashed color-mix(in srgb, var(--brand-ink) 30%, transparent);
+  border-radius: var(--brand-radius);
+}

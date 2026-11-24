@@ -280,6 +280,18 @@ def test_A4_job_list_hides_pending_and_expired_listings(client):
     assert [job["id"] for job in jobs] == [OPEN_LISTING]
 
 
+def test_authenticated_jobs_page_renders_current_listings(client, login_as):
+    login_as(EMPLOYER)
+    response = client.get("/jobs")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Junior Software Engineer" in response.text
+    assert "Acme Soft" in response.text
+    assert "QA Intern" not in response.text
+    assert "Expired Analyst Role" not in response.text
+
+
 def test_A5_cannot_apply_to_expired_listing(client, login_as, audit_db):
     login_as(GRAD_DCIT)
     response = apply_to(client, EXPIRED_LISTING)

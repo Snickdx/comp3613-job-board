@@ -2,15 +2,23 @@
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import api_docs_options, app
 from app.seed import seed
-from app.utilities.security import access_token_cookie_kwargs, create_access_token
+
 
 def setup_module() -> None:
     seed(reset=True)
 
 
 client = TestClient(app)
+
+def test_api_docs_are_enabled_only_in_development():
+    assert api_docs_options("development")["docs_url"] == "/docs"
+    assert api_docs_options("production") == {
+        "docs_url": None,
+        "redoc_url": None,
+        "openapi_url": None,
+    }
 
 
 def test_health_ok():
