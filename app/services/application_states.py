@@ -38,6 +38,7 @@ class ApplicationState:
             "hire": self.hire,
             "reopen": self.reopen,
         }
+        
         handler = actions.get(action)
         if handler is None:
             raise ValueError(f"unknown action {action!r}")

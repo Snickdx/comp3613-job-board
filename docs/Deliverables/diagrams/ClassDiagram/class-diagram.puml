@@ -1,0 +1,289 @@
+@startuml
+title Job Board - Class Diagram: Application Lifecycle (State pattern) - As implemented in Sprint 2
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1B365D
+  FontColor #1E232D
+  BackgroundColor<<inherited>> #FDECEC
+  BorderColor<<inherited>> #B42318
+  BackgroundColor<<state>> #FFF4E5
+  BorderColor<<state>> #C2410C
+  BackgroundColor<<concrete state>> #FFF4E5
+  BorderColor<<concrete state>> #C2410C
+  BackgroundColor<<context>> #FFF4E5
+  BorderColor<<context>> #C2410C
+  BackgroundColor<<module>> #EEF4FB
+  BorderColor<<module>> #1B365D
+}
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #1B365D
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+skinparam ArrowColor #1B365D
+hide empty members
+
+' =====================================================================
+package "INHERITED DESIGN (Sprint 1 starter, removed in Sprint 2)" as Before {
+  class "Application" as OldApplication <<inherited>> {
+    +status: str
+    +flag_reviewed: int
+    +flag_shortlisted: int
+    +flag_rejected: int
+    +flag_hired: int
+  }
+  class "lifecycle (old)" as OldLifecycle <<inherited>> {
+    +apply_action(app, action): dict
+    +derived_status_from_flags(app): str
+  }
+  OldLifecycle ..> OldApplication : nested if/elif on\nstatus AND flags
+  note bottom of OldLifecycle
+    Status stored twice; no legal-transition rules.
+    Caused D1-D7 (LifecycleAudit.md).
+  end note
+}
+
+' =====================================================================
+package "Application lifecycle - State pattern\napp/services/application_states.py" as StatePkg {
+  abstract class ApplicationState <<state>> {
+    +status: str
+    +review(): ApplicationState
+    +mark_reviewed(): ApplicationState
+    +shortlist(): ApplicationState
+    +reject(): ApplicationState
+    +hire(): ApplicationState
+    +reopen(): ApplicationState
+    +transition(action: str): ApplicationState
+  }
+  note right of ApplicationState
+    Every action raises IllegalTransition by default.
+    Concrete states override ONLY their legal moves.
+    transition() maps the API action name to the method;
+    an unknown name raises ValueError.
+    mark_reviewed() is the API alias of review().
+  end note
+
+  class SubmittedState <<concrete state>> {
+    +status = "submitted"
+    +review(): ReviewedState
+    +mark_reviewed(): ReviewedState
+  }
+  class ReviewedState <<concrete state>> {
+    +status = "reviewed"
+    +shortlist(): ShortlistedState
+    +reject(): RejectedState
+  }
+  class ShortlistedState <<concrete state>> {
+    +status = "shortlisted"
+    +hire(): HiredState
+    +reject(): RejectedState
+  }
+  class RejectedState <<concrete state>> {
+    +status = "rejected"
+    +reopen(): ReviewedState
+  }
+  class HiredState <<concrete state>> {
+    +status = "hired"
+  }
+  note bottom of HiredState
+    Final state: overrides nothing,
+    so every action raises IllegalTransition.
+  end note
+
+  class IllegalTransition <<exception>> {
+    +status: str
+    +action: str
+  }
+
+  class "application_states (module)" as StatesModule <<module>> {
+    +STATES: dict[str, ApplicationState]
+    +state_for(status: str): ApplicationState
+  }
+  note bottom of StatesModule
+    STATES holds one shared instance per status.
+    state_for() maps the stored status string
+    to its state object (ValueError if unknown).
+  end note
+
+  ApplicationState <|-- SubmittedState
+  ApplicationState <|-- ReviewedState
+  ApplicationState <|-- ShortlistedState
+  ApplicationState <|-- RejectedState
+  ApplicationState <|-- HiredState
+  ApplicationState ..> IllegalTransition : raises
+  StatesModule o-- "5" ApplicationState : STATES
+
+  SubmittedState ..> ReviewedState : review
+  ReviewedState ..> ShortlistedState : shortlist
+  ReviewedState ..> RejectedState : reject
+  ShortlistedState ..> HiredState : hire
+  ShortlistedState ..> RejectedState : reject
+  RejectedState ..> ReviewedState : reopen
+}
+
+' =====================================================================
+package "Context - app/services/lifecycle.py" as ContextPkg {
+  class "lifecycle (module)" as Lifecycle <<context>> {
+    +ACTIONS: tuple
+    +apply_action(app: dict, action: str): dict
+  }
+  note bottom of Lifecycle
+    Looks up state_for(app.status), calls transition(action),
+    returns the next status. Converts failures to error codes:
+    IllegalTransition -> "illegal_transition"
+    ValueError / unknown action -> "invalid_action"
+  end note
+}
+
+' =====================================================================
+package "Services (client of the pattern)" as Services {
+  class "applications (service)" as ApplicationService <<module>> {
+    +apply(graduate_id, listing_id, cover_letter, resume_text): dict
+    +my_applications(graduate_id): list
+    +listing_applicants(viewer_id, listing_id): dict
+    +export_applicants(admin_id, listing_id): dict
+    +transition_application(actor_id, application_id, action): dict
+    +owns_listing(user, listing): bool
+  }
+  note bottom of ApplicationService
+    transition_application():
+    1. actor must be an employer (admins refused, AC 12)
+    2. load application (else "not_found")
+    3. owns_listing() check BEFORE the state is called (D5)
+    4. apply_action() -> save the single status field
+  end note
+
+  class "listings (service)" as ListingService <<module>> {
+    +ELIGIBLE_PROGRAMMES: set
+    +is_eligible_graduate(user): bool
+    +is_open_to_graduates(listing, today): bool
+    +subscribe(graduate_id): dict
+    +list_jobs_for_graduates(): list
+    +list_pending_for_admin(): list
+    +submit_listing(...): dict
+    +publish_listing(admin_id, listing_id): dict
+    +notify_subscribers(admin_id, listing_id): dict
+  }
+  note bottom of ListingService
+    Eligibility (AC 8) and listing visibility
+    (published + before deadline, AC 4/6).
+    apply() also refuses external-link listings (AC 13).
+  end note
+}
+
+package "API layer - app/routers/board.py" as Api {
+  class "board (router)" as Board <<module>> {
+    +ERROR_STATUS: dict
+    +raise_for_error(result, default=400)
+    +transition(application_id, user: AuthDep, body)
+    +applicants(listing_id, user: AuthDep)
+    +export(listing_id, user: AdminDep)
+    +apply(user: AuthDep, body)
+    +subscribe(user: AuthDep)
+  }
+  note bottom of Board
+    ERROR_STATUS: invalid_action -> 400, forbidden -> 403,
+    not_found -> 404, illegal_transition -> 409 (D6).
+    Acting user comes from the JWT session cookie
+    (AuthDep / AdminDep), not a request field (A1).
+  end note
+}
+
+' =====================================================================
+package "Domain model" as Domain {
+  enum ApplicationStatus {
+    submitted
+    reviewed
+    shortlisted
+    rejected
+    hired
+  }
+  enum UserRole {
+    graduate
+    employer
+    admin
+  }
+
+  class User <<entity>> {
+    +id: int
+    +username: str
+    +email: str
+    +password: str (hashed)
+    +role: UserRole
+    +programme: str?
+    +field_preference: str?
+    +resume_text: str?
+  }
+  class Listing <<entity>> {
+    +id: int
+    +employer_id: int
+    +title: str
+    +company: str
+    +description: str
+    +apply_mode: str (collect | external)
+    +external_url: str?
+    +deadline: str (ISO date)
+    +status: str
+  }
+  class Application <<entity>> {
+    +id: int
+    +listing_id: int
+    +graduate_id: int
+    +cover_letter: str
+    +resume_text: str
+    +status: ApplicationStatus
+  }
+  note right of Application
+    One source of truth: status.
+    The four flag_* fields were removed (D3, D4).
+  end note
+  class Subscription <<entity>> {
+    +id: int
+    +graduate_id: int
+  }
+  class Notification <<entity>> {
+    +id: int
+    +user_id: int
+    +message: str
+  }
+
+  User "1 employer" -- "0..* " Listing : submits
+  User "1 graduate" -- "0..* " Application : applies
+  Listing "1" -- "0..* " Application : receives
+  User "1 graduate" -- "0..1" Subscription : subscribes
+  User "1 recipient" -- "0..* " Notification : receives
+  Application --> ApplicationStatus
+  User --> UserRole
+}
+
+' ---- cross-package links ----
+Board ..> ApplicationService : calls
+Board ..> ListingService : calls
+ApplicationService ..> Lifecycle : apply_action()
+ApplicationService ..> ListingService : is_eligible_graduate()\nis_open_to_graduates()
+Lifecycle ..> StatesModule : state_for(status)
+Lifecycle ..> ApplicationState : transition(action)
+Lifecycle ..> IllegalTransition : catches
+ApplicationService ..> Application : reads / saves status
+ListingService ..> Listing
+ListingService ..> Subscription
+ListingService ..> Notification
+
+' ---- refactor mapping (before -> after) ----
+OldLifecycle .[#B42318].> ApplicationState : <color:#B42318>replaced by</color>
+OldApplication .[#B42318].> Application : <color:#B42318>flags removed</color>
+
+' ---- layout hints ----
+Before -[hidden]right- StatePkg
+StatePkg -[hidden]down- ContextPkg
+ContextPkg -[hidden]down- Services
+Services -[hidden]down- Api
+Api -[hidden]down- Domain
+@enduml
+
