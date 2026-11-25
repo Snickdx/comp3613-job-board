@@ -5,12 +5,22 @@ import uvicorn
 from fastapi import FastAPI, Request, status
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse
+from starlette.responses import JSONResponse, RedirectResponse
 
 from app.config import get_settings
 from app.routers import api_router, router, static_files, templates
 
 logger = logging.getLogger(__name__)
+
+
+def api_docs_options(env: str) -> dict[str, str | None]:
+    if env.lower() in {"dev", "development"}:
+        return {
+            "docs_url": "/docs",
+            "redoc_url": "/redoc",
+            "openapi_url": "/openapi.json",
+        }
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
 
 
 @asynccontextmanager
@@ -23,6 +33,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
+    **api_docs_options(get_settings().env),
     middleware=[
         Middleware(SessionMiddleware, secret_key=get_settings().secret_key)
     ],
@@ -41,7 +52,7 @@ async def recover_uninitialized_db(request: Request, call_next):
 
     try:
         return await call_next(request)
-    except Exception as exc:  # noqa: BLE001 — catch then re-raise if not DB init
+    except Exception as exc:
         if not recover_if_uninitialized(exc):
             raise
         logger.info("Retrying %s after database init", request.url.path)
@@ -61,6 +72,10 @@ async def health():
 
 @app.exception_handler(status.HTTP_401_UNAUTHORIZED)
 async def unauthorized_redirect_handler(request: Request, exc: Exception):
+    # The JSON API must answer 401 itself; only browser pages get the HTML login prompt.
+    if request.url.path.startswith("/api/"):
+        detail = getattr(exc, "detail", "Not authenticated")
+        return JSONResponse(status_code=401, content={"detail": detail})
     return templates.TemplateResponse(
         request=request,
         name="401.html",

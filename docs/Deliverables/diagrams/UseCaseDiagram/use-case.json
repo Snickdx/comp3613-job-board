@@ -1,0 +1,132 @@
+{
+  "system": "Job Board",
+  "actors": [
+    {
+      "name": "Graduate",
+      "side": "left"
+    },
+    {
+      "name": "Employer",
+      "side": "left"
+    },
+    {
+      "name": "Administrator",
+      "side": "right"
+    }
+  ],
+  "use_cases": [
+    {
+      "name": "Browse published jobs",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Subscribe to job alerts",
+      "actors": [
+        "Graduate"
+      ],
+      "includes": [
+        "Check programme eligibility"
+      ]
+    },
+    {
+      "name": "Receive job notifications",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Apply to job",
+      "actors": [
+        "Graduate"
+      ],
+      "includes": [
+        "Check programme eligibility"
+      ]
+    },
+    {
+      "name": "Go to external apply link",
+      "actors": [],
+      "extends": [
+        "Apply to job"
+      ]
+    },
+    {
+      "name": "View my application status",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Manage profile & resume",
+      "actors": [
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Submit job listing",
+      "actors": [
+        "Employer"
+      ]
+    },
+    {
+      "name": "View applicants for own listing",
+      "actors": [
+        "Employer"
+      ],
+      "includes": [
+        "Verify listing ownership"
+      ]
+    },
+    {
+      "name": "Advance application lifecycle",
+      "actors": [
+        "Employer"
+      ],
+      "includes": [
+        "Verify listing ownership"
+      ]
+    },
+    {
+      "name": "Send / receive messages (future)",
+      "actors": [
+        "Employer",
+        "Graduate"
+      ]
+    },
+    {
+      "name": "Review pending listings",
+      "actors": [
+        "Administrator"
+      ]
+    },
+    {
+      "name": "Publish listing",
+      "actors": [
+        "Administrator"
+      ],
+      "includes": [
+        "Notify eligible subscribers"
+      ]
+    },
+    {
+      "name": "Export applicant package",
+      "actors": [
+        "Administrator"
+      ]
+    },
+    {
+      "name": "Check programme eligibility",
+      "actors": []
+    },
+    {
+      "name": "Verify listing ownership",
+      "actors": []
+    },
+    {
+      "name": "Notify eligible subscribers",
+      "actors": []
+    }
+  ]
+}

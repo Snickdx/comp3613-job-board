@@ -1,0 +1,26 @@
+{% extends "authenticated-base.html" %}
+{% block title %}Jobs · HireBoard{% endblock %}
+
+{% block subpage_content %}
+<h1>Available jobs</h1>
+<p>Browse current published openings.</p>
+
+{% if jobs %}
+<div class="job-list">
+  {% for job in jobs %}
+  <article class="job-card">
+    <div class="job-card-heading">
+      <h2>{{ job.title }}</h2>
+      <span>{{ job.company }}</span>
+    </div>
+    <p>{{ job.description }}</p>
+    <div class="job-card-footer">
+      <span>Apply by {{ job.deadline }}</span>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="job-empty-state">There are no current job openings.</p>
+{% endif %}
+{% endblock %}

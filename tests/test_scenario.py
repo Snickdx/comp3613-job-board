@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import api_docs_options, app
 from app.seed import seed
 
 
@@ -11,6 +11,14 @@ def setup_module() -> None:
 
 
 client = TestClient(app)
+
+def test_api_docs_are_enabled_only_in_development():
+    assert api_docs_options("development")["docs_url"] == "/docs"
+    assert api_docs_options("production") == {
+        "docs_url": None,
+        "redoc_url": None,
+        "openapi_url": None,
+    }
 
 
 def test_health_ok():
@@ -28,6 +36,9 @@ def test_api_login_seed_admin():
     )
     assert r.status_code == 200
     assert r.json()["user"]["role"] == "admin"
+    
+    #token retrieval 
+    assert r.cookies.get("access_token")
 
 
 def test_jobs_endpoint_returns_list():
