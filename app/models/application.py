@@ -9,8 +9,10 @@ class Application(SQLModel, table=True):
     graduate_id: int = Field(index=True)
     cover_letter: str
     resume_text: str
-    # Canonical label (often drifts from the boolean flags below).
+    # Canonical lifecycle status: the single source of truth.
     status: str
+    # Legacy flags, kept for database compatibility. lifecycle.py derives
+    # them from `status` on every change, so they cannot drift.
     flag_reviewed: int = 0
     flag_shortlisted: int = 0
     flag_rejected: int = 0
